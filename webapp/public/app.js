@@ -72,6 +72,7 @@ function showAuth(message = '') {
   $('#userStatus').textContent = 'Guest';
   $('#logoutButton').disabled = true;
   $('#authMessage').textContent = message;
+  setAdminUi(false);
 }
 
 function showApp() {
@@ -79,9 +80,28 @@ function showApp() {
   document.querySelector('main').classList.remove('hidden');
   $('#userStatus').textContent = state.user ? `User: ${state.user.username}` : 'Guest';
   $('#logoutButton').disabled = !state.user;
+  setAdminUi(Boolean(state.user?.isAdmin));
+  if (!state.user?.isAdmin) {
+    $('#membersView').classList.add('hidden');
+    $('#auditView').classList.add('hidden');
+    $('#prizesView').classList.remove('hidden');
+    document.querySelectorAll('.tab').forEach((button) => {
+      button.classList.toggle('active', button.dataset.view === 'prizes');
+    });
+  }
+}
+
+function setAdminUi(isAdmin) {
+  document.querySelectorAll('.adminOnly').forEach((element) => {
+    element.classList.toggle('hidden', !isAdmin);
+  });
 }
 
 async function refreshServerStatus() {
+  if (!state.user?.isAdmin) {
+    setAdminUi(false);
+    return;
+  }
   const label = $('#serverStatus');
   if (!label) return;
   try {
@@ -104,12 +124,14 @@ async function refreshServerStatus() {
 }
 
 async function startServer() {
+  if (!state.user?.isAdmin) return;
   await controlApi('/api/server/start', { method: 'POST' });
   await refreshServerStatus();
   await loadAll();
 }
 
 async function stopServer() {
+  if (!state.user?.isAdmin) return;
   try {
     await controlApi('/api/server/stop', { method: 'POST' });
   } catch (_) {
@@ -155,8 +177,11 @@ async function logout() {
 }
 
 async function loadAll() {
-  await Promise.all([loadStores(), loadPrizes(), loadMembers()]);
-  await loadAudit();
+  await Promise.all([
+    loadStores(),
+    loadPrizes(),
+    ...(state.user?.isAdmin ? [loadMembers(), loadAudit()] : []),
+  ]);
   await refreshServerStatus();
   $('#dbStatus').textContent = `SQLite DB接続中 / ${state.prizes.length}件`;
 }
@@ -419,6 +444,9 @@ function bindEvents() {
 
     const tab = target.closest('.tab');
     if (tab) {
+      if ((tab.dataset.view === 'members' || tab.dataset.view === 'audit') && !state.user?.isAdmin) {
+        return;
+      }
       document.querySelectorAll('.tab').forEach(button => button.classList.toggle('active', button === tab));
       document.querySelectorAll('.view').forEach(view => view.classList.add('hidden'));
       $(`#${tab.dataset.view}View`).classList.remove('hidden');
@@ -455,8 +483,8 @@ function bindEvents() {
       return;
     }
 
-    if (target.id === 'startServerButton') return startServer();
-    if (target.id === 'stopServerButton') return stopServer();
+    if (target.id === 'startServerButton' && state.user?.isAdmin) return startServer();
+    if (target.id === 'stopServerButton' && state.user?.isAdmin) return stopServer();
 
     if (target.id === 'saveImageUrl' && state.selectedPrizeId) {
       await api(`/api/prizes/${state.selectedPrizeId}/image`, {

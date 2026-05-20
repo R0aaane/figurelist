@@ -432,16 +432,19 @@ class PrizeRepository {
     if (item.sourceUrl != null && item.sourceUrl!.trim().isNotEmpty) {
       final byUrl =
           await (_database.select(_database.prizeItems)
-                ..where((t) => t.sourceUrl.equals(item.sourceUrl!.trim())))
+                ..where((t) => t.sourceUrl.equals(item.sourceUrl!.trim()))
+                ..limit(1))
               .getSingleOrNull();
       if (byUrl != null) {
         return byUrl;
       }
     }
 
-    return (_database.select(_database.prizeItems)..where(
-          (t) => t.title.equals(item.title) & t.maker.equals(item.maker),
-        ))
+    return (_database.select(_database.prizeItems)
+          ..where(
+            (t) => t.title.equals(item.title) & t.maker.equals(item.maker),
+          )
+          ..limit(1))
         .getSingleOrNull();
   }
 
@@ -511,7 +514,8 @@ class PrizeRepository {
     if (store.sourceUrl != null && store.sourceUrl!.trim().isNotEmpty) {
       final byUrl =
           await (_database.select(_database.prizeStores)
-                ..where((t) => t.sourceUrl.equals(store.sourceUrl!.trim())))
+                ..where((t) => t.sourceUrl.equals(store.sourceUrl!.trim()))
+                ..limit(1))
               .getSingleOrNull();
       if (byUrl != null) {
         return byUrl;
@@ -519,7 +523,8 @@ class PrizeRepository {
     }
 
     return (_database.select(_database.prizeStores)
-          ..where((t) => t.name.equals(store.name) & t.area.equals(store.area)))
+          ..where((t) => t.name.equals(store.name) & t.area.equals(store.area))
+          ..limit(1))
         .getSingleOrNull();
   }
 
@@ -530,7 +535,7 @@ class PrizeRepository {
           (t) =>
               t.prizeId.equals(appearance.prizeId) &
               t.storeId.equals(appearance.storeId),
-        ))
+        )..limit(1))
         .getSingleOrNull();
   }
 

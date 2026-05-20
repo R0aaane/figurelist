@@ -26,6 +26,7 @@ class _ServerAccountPageState extends State<ServerAccountPage> {
     _controlUrlController = TextEditingController(
       text: widget.service.controlBaseUrl,
     );
+    _usernameController.text = widget.service.username ?? '';
   }
 
   @override
@@ -171,5 +172,6 @@ class _ServerAccountPageState extends State<ServerAccountPage> {
   void _saveUrls() {
     widget.service.appBaseUrl = _appUrlController.text.trim();
     widget.service.controlBaseUrl = _controlUrlController.text.trim();
+    widget.service.saveSession();
   }
 }

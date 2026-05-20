@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import 'data/app_database.dart';
@@ -33,6 +35,14 @@ class _MyAppState extends State<MyApp> {
     _database = AppDatabase();
     _repository = PrizeRepository(_database);
     _serverSyncService = ServerSyncService(_database);
+    unawaited(_restoreServerSession());
+  }
+
+  Future<void> _restoreServerSession() async {
+    final restored = await _serverSyncService.restoreSession();
+    if (restored) {
+      await _serverSyncService.syncFromServer();
+    }
   }
 
   @override

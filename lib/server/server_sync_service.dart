@@ -1,8 +1,11 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:drift/drift.dart';
 import 'package:http/http.dart' as http;
+import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
 
 import '../data/app_database.dart';
 
@@ -40,6 +43,7 @@ class ServerSyncService {
     required String password,
   }) async {
     await _authenticate('register', username: username, password: password);
+    await saveSession();
   }
 
   Future<void> login({
@@ -47,6 +51,55 @@ class ServerSyncService {
     required String password,
   }) async {
     await _authenticate('login', username: username, password: password);
+    await saveSession();
+  }
+
+  Future<bool> restoreSession() async {
+    final file = await _sessionFile();
+    if (!await file.exists()) return false;
+
+    try {
+      final json = jsonDecode(await file.readAsString()) as Map<String, dynamic>;
+      appBaseUrl = json['appBaseUrl'] as String? ?? appBaseUrl;
+      controlBaseUrl = json['controlBaseUrl'] as String? ?? controlBaseUrl;
+      _cookie = json['cookie'] as String?;
+      username = json['username'] as String?;
+      if (_cookie == null) return false;
+
+      final response = await _client.get(
+        _appUri('/api/auth/session'),
+        headers: _headers,
+      );
+      if (response.statusCode != 200) {
+        await clearSavedSession();
+        return false;
+      }
+      final body = jsonDecode(response.body) as Map<String, dynamic>;
+      final user = body['user'] as Map<String, dynamic>?;
+      if (user == null) {
+        await clearSavedSession();
+        return false;
+      }
+      username = user['username'] as String?;
+      await saveSession();
+      return isLoggedIn;
+    } on Object {
+      await clearSavedSession();
+      return false;
+    }
+  }
+
+  Future<void> saveSession() async {
+    final file = await _sessionFile();
+    await file.parent.create(recursive: true);
+    await file.writeAsString(
+      jsonEncode({
+        'appBaseUrl': appBaseUrl,
+        'controlBaseUrl': controlBaseUrl,
+        'cookie': _cookie,
+        'username': username,
+      }),
+    );
   }
 
   Future<void> _authenticate(
@@ -71,6 +124,14 @@ class ServerSyncService {
     }
     _cookie = null;
     username = null;
+    await clearSavedSession();
+  }
+
+  Future<void> clearSavedSession() async {
+    final file = await _sessionFile();
+    if (await file.exists()) {
+      await file.delete();
+    }
   }
 
   Future<Map<String, dynamic>> serverStatus() async {
@@ -221,6 +282,11 @@ class ServerSyncService {
   Uri _appUri(String path) => Uri.parse(appBaseUrl).resolve(path);
 
   Uri _controlUri(String path) => Uri.parse(controlBaseUrl).resolve(path);
+
+  Future<File> _sessionFile() async {
+    final directory = await getApplicationSupportDirectory();
+    return File(p.join(directory.path, 'server_session.json'));
+  }
 
   void _storeCookie(http.Response response) {
     final cookie = response.headers['set-cookie'];

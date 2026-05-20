@@ -120,6 +120,143 @@ const samplePrizes = [
   }
 ];
 
+const supplementalPrizes = [
+  {
+    title: 'To LOVEる-とらぶる-ダークネス BiCute Bunnies Figure 金色の闇',
+    workTitle: 'To LOVEる-とらぶる-ダークネス',
+    characterName: '金色の闇',
+    seriesName: 'BiCute Bunnies',
+    maker: 'フリュー',
+    releaseText: '2026年4月 第2週',
+    releaseYear: 2026,
+    releaseMonth: 4,
+    sourceUrl: 'https://charahiroba.com/prize/item/detail?id=15815',
+    imageUrl: 'https://file.charahiroba.com/img/trans/contents/18140_p_thu.jpg'
+  },
+  {
+    title: 'To LOVEる-とらぶる-ダークネス Aqua Float Girls フィギュア モモ',
+    workTitle: 'To LOVEる-とらぶる-ダークネス',
+    characterName: 'モモ',
+    seriesName: 'Aqua Float Girls',
+    maker: 'タイトー',
+    releaseText: '2026年3月中旬',
+    releaseYear: 2026,
+    releaseMonth: 3,
+    sourceUrl: 'https://www.taito.co.jp/taito-prize/0452014400',
+    imageUrl: 'https://www.taito.co.jp/Content/images/zone/2/item/201407/6699f430-3673-4da5-87f2-e1ec294ef8d8_p_01_ja.jpg'
+  },
+  {
+    title: 'To LOVEる-とらぶる-ダークネス Trio-Try-iT Figure モモ・ベリア・デビルーク',
+    workTitle: 'To LOVEる-とらぶる-ダークネス',
+    characterName: 'モモ',
+    seriesName: 'Trio-Try-iT',
+    maker: 'フリュー',
+    releaseText: '2026年3月 第3週',
+    releaseYear: 2026,
+    releaseMonth: 3,
+    sourceUrl: 'https://charahiroba.com/prize/item/detail?id=15681',
+    imageUrl: 'https://file.charahiroba.com/img/trans/contents/17970_p_thu.jpg'
+  },
+  {
+    title: 'To LOVEる-とらぶる-ダークネス Trio-Try-iT Figure ララ・サタリン・デビルーク',
+    workTitle: 'To LOVEる-とらぶる-ダークネス',
+    characterName: 'ララ',
+    seriesName: 'Trio-Try-iT',
+    maker: 'フリュー',
+    releaseText: '2026年2月 第3週',
+    releaseYear: 2026,
+    releaseMonth: 2,
+    sourceUrl: 'https://charahiroba.com/prize/item/detail?id=15517',
+    imageUrl: 'https://file.charahiroba.com/img/trans/contents/17697_p_thu.jpg'
+  },
+  {
+    title: 'To LOVEる-とらぶる-ダークネス Trio-Try-iT Figure 古手川唯',
+    workTitle: 'To LOVEる-とらぶる-ダークネス',
+    characterName: '古手川唯',
+    seriesName: 'Trio-Try-iT',
+    maker: 'フリュー',
+    releaseText: '2026年2月 第3週',
+    releaseYear: 2026,
+    releaseMonth: 2,
+    sourceUrl: 'https://charahiroba.com/prize/item/detail?id=15516',
+    imageUrl: 'https://file.charahiroba.com/img/trans/contents/17696_p_thu.jpg'
+  },
+  {
+    title: 'To LOVEる-とらぶる-ダークネス Aqua Float Girls フィギュア 結城美柑',
+    workTitle: 'To LOVEる-とらぶる-ダークネス',
+    characterName: '結城美柑',
+    seriesName: 'Aqua Float Girls',
+    maker: 'タイトー',
+    releaseText: '2026年1月下旬',
+    releaseYear: 2026,
+    releaseMonth: 1,
+    sourceUrl: 'https://www.taito.co.jp/taito-prize/0451992700',
+    imageUrl: 'https://www.taito.co.jp/Content/images/zone/2/item/201407/ba25c024-ae95-4691-b7ac-aa60d81ba974_p_01_ja.jpg'
+  },
+  {
+    title: 'To LOVEる-とらぶる-ダークネス Desktop Cute フィギュア ナナ チャイナドレスver.',
+    workTitle: 'To LOVEる-とらぶる-ダークネス',
+    characterName: 'ナナ',
+    seriesName: 'Desktop Cute',
+    maker: 'タイトー',
+    releaseText: '2026年1月中旬',
+    releaseYear: 2026,
+    releaseMonth: 1,
+    sourceUrl: 'https://www.taito.co.jp/taito-prize/0451993200',
+    imageUrl: 'https://www.taito.co.jp/Content/images/zone/2/item/201407/23cfc56b-2d83-42d1-99ff-bdd85ba2da68_p_01_ja.jpg'
+  },
+  {
+    title: 'To LOVEる-とらぶる-ダークネス BiCute Bunnies Figure モモ・ベリア・デビルーク',
+    workTitle: 'To LOVEる-とらぶる-ダークネス',
+    characterName: 'モモ',
+    seriesName: 'BiCute Bunnies',
+    maker: 'フリュー',
+    releaseText: '2025年12月 第3週',
+    releaseYear: 2025,
+    releaseMonth: 12,
+    sourceUrl: 'https://charahiroba.com/prize/item/detail?id=15153',
+    imageUrl: 'https://file.charahiroba.com/img/trans/contents/18460_p_thu.jpg'
+  },
+  {
+    title: 'To LOVEる-とらぶる-ダークネス Desktop Cute フィギュア 金色の闇 ルームウェアver.',
+    workTitle: 'To LOVEる-とらぶる-ダークネス',
+    characterName: '金色の闇',
+    seriesName: 'Desktop Cute',
+    maker: 'タイトー',
+    releaseText: '2025年11月下旬',
+    releaseYear: 2025,
+    releaseMonth: 11,
+    sourceUrl: 'https://www.taito.co.jp/taito-prize/0451955000',
+    imageUrl: 'https://www.taito.co.jp/Content/images/zone/2/item/201407/726d90df-87a2-4cd7-8da5-90049aefba35_p_01_ja.jpg'
+  },
+  {
+    title: 'To LOVEる-とらぶる-ダークネス Desktop Cute フィギュア 結城美柑 チャイナドレスver.',
+    workTitle: 'To LOVEる-とらぶる-ダークネス',
+    characterName: '結城美柑',
+    seriesName: 'Desktop Cute',
+    maker: 'タイトー',
+    releaseText: '2025年10月中旬',
+    releaseYear: 2025,
+    releaseMonth: 10,
+    sourceUrl: 'https://www.taito.co.jp/taito-prize/0451947500',
+    imageUrl: 'https://www.taito.co.jp/Content/images/zone/2/item/201407/845df675-3cf4-4f86-a747-319fb1ae13d9_p_01_ja.jpg'
+  },
+  {
+    title: 'To LOVEる-とらぶる-ダークネス Desktop Cute フィギュア 古手川唯 チャイナドレスver.',
+    workTitle: 'To LOVEる-とらぶる-ダークネス',
+    characterName: '古手川唯',
+    seriesName: 'Desktop Cute',
+    maker: 'タイトー',
+    releaseText: '2025年7月中旬',
+    releaseYear: 2025,
+    releaseMonth: 7,
+    sourceUrl: 'https://www.taito.co.jp/taito-prize/0451904800',
+    imageUrl: 'https://www.taito.co.jp/Content/images/zone/2/item/201407/c76cea0a-43a5-48ba-acc8-fb8d518ab72b_p_01_ja.jpg'
+  }
+];
+
+const allSamplePrizes = [...samplePrizes, ...supplementalPrizes];
+
 const sampleStores = [
   { name: 'タイトーステーション 名古屋名駅店', area: '名古屋駅', address: '愛知県名古屋市中村区', sourceUrl: 'https://www.taito.co.jp/store/00002253' },
   { name: 'タイトーステーション 大須店', area: '大須', address: null, sourceUrl: 'https://www.taito.co.jp/store/00002035' },
@@ -251,7 +388,7 @@ function recordAudit(tableName, rowId, action, before, after, userId = null) {
 function seed() {
   db.exec('BEGIN');
   try {
-    for (const item of samplePrizes) {
+    for (const item of allSamplePrizes) {
       const existing = item.sourceUrl
         ? db.prepare('SELECT * FROM prize_items WHERE sourceUrl = ?').get(item.sourceUrl)
         : null;
@@ -259,7 +396,7 @@ function seed() {
         const before = { ...existing };
         db.prepare(`
           UPDATE prize_items SET title = ?, workTitle = ?, characterName = ?, seriesName = ?, maker = ?,
-          releaseText = ?, releaseYear = ?, releaseMonth = ?, imageUrl = ?, updatedAtEpochMs = ?
+          releaseText = ?, releaseYear = ?, releaseMonth = ?, imageUrl = COALESCE(imageUrl, ?), updatedAtEpochMs = ?
           WHERE id = ?
         `).run(item.title, item.workTitle, item.characterName, item.seriesName, item.maker, item.releaseText, item.releaseYear, item.releaseMonth, item.imageUrl, now(), existing.id);
         recordAudit('prize_items', existing.id, 'sync_update', before, getRow('prize_items', existing.id));
@@ -410,6 +547,10 @@ function currentUser(req) {
   return row || null;
 }
 
+function isAdmin(user) {
+  return user?.username === 'admin';
+}
+
 function getUserState(userId, prizeId) {
   return db.prepare('SELECT * FROM user_prize_states WHERE userId = ? AND prizeId = ?').get(userId, prizeId) || null;
 }
@@ -436,7 +577,10 @@ async function handleApi(req, res, url) {
   const segments = url.pathname.split('/').filter(Boolean).slice(1);
 
   if (method === 'GET' && segments[0] === 'auth' && segments[1] === 'session') {
-    return send(res, 200, { user: currentUser(req) });
+    const user = currentUser(req);
+    return send(res, 200, {
+      user: user == null ? null : {...user, isAdmin: isAdmin(user)},
+    });
   }
 
   if (method === 'POST' && segments[0] === 'auth' && segments[1] === 'register') {
@@ -457,7 +601,13 @@ async function handleApi(req, res, url) {
       `).run(username, passwordData.salt, passwordData.hash, now());
       const session = createSession(result.lastInsertRowid);
       res.setHeader('set-cookie', sessionCookie(session));
-      return send(res, 201, { user: { id: result.lastInsertRowid, username } });
+      return send(res, 201, {
+        user: {
+          id: result.lastInsertRowid,
+          username,
+          isAdmin: username === 'admin',
+        },
+      });
     } catch (error) {
       return sendError(res, 409, 'Username already exists');
     }
@@ -475,7 +625,13 @@ async function handleApi(req, res, url) {
     }
     const session = createSession(user.id);
     res.setHeader('set-cookie', sessionCookie(session));
-    return send(res, 200, { user: { id: user.id, username: user.username } });
+    return send(res, 200, {
+      user: {
+        id: user.id,
+        username: user.username,
+        isAdmin: user.username === 'admin',
+      },
+    });
   }
 
   if (method === 'POST' && segments[0] === 'auth' && segments[1] === 'logout') {
@@ -488,7 +644,7 @@ async function handleApi(req, res, url) {
   }
 
   const user = currentUser(req);
-  if (!user && segments[0] !== 'admin') {
+  if (!user) {
     return sendError(res, 401, 'Authentication required');
   }
 
@@ -680,6 +836,7 @@ async function handleApi(req, res, url) {
   }
 
   if (method === 'GET' && segments[0] === 'members' && segments[1] === 'prizes') {
+    if (!isAdmin(user)) return sendError(res, 403, 'Admin only');
     const users = db.prepare('SELECT id, username FROM users ORDER BY username').all();
     const rows = db.prepare(`
       SELECT s.userId, s.status, p.id AS prizeId, p.title, p.characterName, p.seriesName, p.imageUrl, s.updatedAtEpochMs
@@ -717,6 +874,7 @@ async function handleApi(req, res, url) {
   }
 
   if (method === 'GET' && segments[0] === 'audit-logs') {
+    if (!isAdmin(user)) return sendError(res, 403, 'Admin only');
     const limit = Math.min(Number(url.searchParams.get('limit') || 100), 500);
     return send(res, 200, db.prepare(`
       SELECT a.*, u.username
@@ -733,6 +891,7 @@ async function handleApi(req, res, url) {
   }
 
   if (method === 'GET' && segments[0] === 'admin' && segments[1] === 'status') {
+    if (!isAdmin(user)) return sendError(res, 403, 'Admin only');
     return send(res, 200, {
       running: true,
       port,
@@ -742,6 +901,7 @@ async function handleApi(req, res, url) {
   }
 
   if (method === 'POST' && segments[0] === 'admin' && segments[1] === 'shutdown') {
+    if (!isAdmin(user)) return sendError(res, 403, 'Admin only');
     send(res, 200, { ok: true, message: 'Server is stopping' });
     setTimeout(() => {
       try {
@@ -791,9 +951,7 @@ function serveStatic(res, pathname) {
 }
 
 migrate();
-if (db.prepare('SELECT COUNT(*) AS count FROM prize_items').get().count === 0) {
-  seed();
-}
+seed();
 
 const server = http.createServer(async (req, res) => {
   try {

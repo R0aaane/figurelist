@@ -15,16 +15,16 @@
       <nav class="tabs" aria-label="表示切替">
         <button class="tab active" data-view="prizes">一覧</button>
         <button class="tab" data-view="stores">店舗</button>
-        <button class="tab" data-view="members">メンバー</button>
-        <button class="tab" data-view="audit">変更記録</button>
+        <button class="tab adminOnly hidden" data-view="members">メンバー</button>
+        <button class="tab adminOnly hidden" data-view="audit">変更記録</button>
       </nav>
       <div class="serverControls" aria-label="server controls">
         <span id="userStatus">Guest</span>
-        <button id="logoutButton" class="actionButton">Logout</button>
-        <span id="serverStatus">Server checking</span>
-        <button id="startServerButton" class="actionButton">Start</button>
-        <button id="stopServerButton" class="actionButton">Stop</button>
-        <a id="controlLink" class="actionLink" href="http://localhost:4172" target="_blank" rel="noreferrer">Control</a>
+        <button id="logoutButton" class="actionButton" disabled>Logout</button>
+        <span id="serverStatus" class="adminOnly hidden">Server checking</span>
+        <button id="startServerButton" class="actionButton adminOnly hidden">Start</button>
+        <button id="stopServerButton" class="actionButton adminOnly hidden">Stop</button>
+        <a id="controlLink" class="actionLink adminOnly hidden" href="http://localhost:4172" target="_blank" rel="noreferrer">Control</a>
       </div>
     </header>
 
@@ -47,7 +47,7 @@
       </div>
     </section>
 
-    <main>
+    <main class="hidden">
       <section id="prizesView" class="view">
         <div class="toolbar">
           <div class="segmented" id="statusFilter">
