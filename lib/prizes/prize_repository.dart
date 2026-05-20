@@ -140,6 +140,36 @@ class PrizeRepository {
     return savedItems;
   }
 
+  Future<PrizeItem> addManualPrize({
+    required String title,
+    String? workTitle,
+    String? characterName,
+    String? seriesName,
+    String? maker,
+    String? releaseText,
+    String? sourceUrl,
+    String? imageUrl,
+  }) async {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final id = await _database
+        .into(_database.prizeItems)
+        .insert(
+          PrizeItemsCompanion.insert(
+            title: title.trim(),
+            workTitle: _blankToNull(workTitle) ?? title.trim(),
+            characterName: _blankToNull(characterName) ?? title.trim(),
+            seriesName: _blankToNull(seriesName) ?? '手動追加',
+            maker: _blankToNull(maker) ?? '未設定',
+            releaseText: _blankToNull(releaseText) ?? '未設定',
+            sourceUrl: Value(_blankToNull(sourceUrl)),
+            imageUrl: Value(_blankToNull(imageUrl)),
+            createdAtEpochMs: now,
+            updatedAtEpochMs: now,
+          ),
+        );
+    return getPrize(id);
+  }
+
   Future<PrizeItem> getPrize(int id) async {
     return (_database.select(
       _database.prizeItems,

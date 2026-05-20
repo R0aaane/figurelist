@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../data/app_database.dart';
 import '../server/server_account_page.dart';
 import '../server/server_sync_service.dart';
+import 'figure_add_page.dart';
 import 'prize_detail_page.dart';
 import 'prize_notification_service.dart';
 import 'prize_repository.dart';
@@ -70,6 +71,20 @@ class _PrizeListPageState extends State<PrizeListPage> {
       appBar: AppBar(
         title: const Text('\u30d7\u30e9\u30a4\u30ba\u53ce\u96c6\u7ba1\u7406'),
         actions: [
+          IconButton(
+            tooltip: 'フィギュア追加',
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => FigureAddPage(
+                    repository: widget.repository,
+                    serverSyncService: widget.serverSyncService,
+                  ),
+                ),
+              );
+            },
+            icon: const Icon(Icons.add),
+          ),
           IconButton(
             tooltip: 'サーバー同期',
             onPressed: () {
@@ -231,7 +246,7 @@ class _PrizeListPageState extends State<PrizeListPage> {
           title: const Text('\u30d7\u30e9\u30a4\u30ba\u3092\u524a\u9664'),
           content: Text(
             '${prize.title}\n\n'
-            '\u3053\u306e\u30d7\u30e9\u30a4\u30ba\u3068\u95a2\u9023\u3059\u308b\u7372\u5f97\u30ed\u30b0\u3092\u524a\u9664\u3057\u307e\u3059\u3002',
+            '\u30ed\u30b0\u30a4\u30f3\u4e2d\u306e\u5834\u5408\u306f\u3053\u306e\u30a2\u30ab\u30a6\u30f3\u30c8\u306e\u4e00\u89a7\u304b\u3089\u306e\u307f\u524a\u9664\u3057\u307e\u3059\u3002',
           ),
           actions: [
             TextButton(
@@ -249,6 +264,10 @@ class _PrizeListPageState extends State<PrizeListPage> {
 
     if (shouldDelete != true || !mounted) {
       return;
+    }
+    final syncService = widget.serverSyncService;
+    if (syncService != null && syncService.isLoggedIn) {
+      await syncService.hidePrize(prize.id);
     }
     await widget.repository.deletePrize(prize.id);
     if (!mounted) {

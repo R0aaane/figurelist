@@ -19,7 +19,7 @@ const db = new DatabaseSync(dbPath);
 db.exec('PRAGMA foreign_keys = ON');
 db.exec('PRAGMA journal_mode = WAL');
 
-const statuses = new Set(['unowned', 'owned', 'reserved', 'skipped']);
+const statuses = new Set(['unowned', 'owned', 'reserved', 'skipped', 'hidden']);
 
 const samplePrizes = [
   {
@@ -564,7 +564,7 @@ function getPrizeForUser(userId, prizeId) {
       COALESCE(s.updatedAtEpochMs, p.updatedAtEpochMs) AS updatedAtEpochMs
     FROM prize_items p
     LEFT JOIN user_prize_states s ON s.prizeId = p.id AND s.userId = ?
-    WHERE p.id = ?
+    WHERE p.id = ? AND (s.status IS NULL OR s.status <> 'hidden')
   `).get(userId, prizeId) || null;
 }
 
@@ -649,8 +649,13 @@ async function handleApi(req, res, url) {
   }
 
   if (method === 'GET' && segments[0] === 'prizes' && segments.length === 1) {
+    const includeHidden = url.searchParams.get('includeHidden') === '1';
     const where = [];
     const params = [];
+    if (!includeHidden) {
+      where.push('(s.status IS NULL OR s.status <> ?)');
+      params.push('hidden');
+    }
     const status = url.searchParams.get('status');
     const character = url.searchParams.get('character');
     const series = url.searchParams.get('series');
@@ -698,6 +703,41 @@ async function handleApi(req, res, url) {
       ORDER BY s.area, s.name
     `).all(id);
     return send(res, 200, { prize, logs, appearances });
+  }
+
+  if (method === 'GET' && segments[0] === 'figure-search') {
+    const query = url.searchParams.get('q') || '';
+    return send(res, 200, await searchFigureCandidates(query));
+  }
+
+  if (method === 'POST' && segments[0] === 'prizes' && segments.length === 1) {
+    const body = await readJson(req);
+    const title = blank(body.title);
+    if (!title) return sendError(res, 400, 'Title is required');
+    const createdAt = now();
+    const result = db.prepare(`
+      INSERT INTO prize_items (
+        title, workTitle, characterName, seriesName, maker, releaseText,
+        releaseYear, releaseMonth, sourceUrl, imageUrl, createdAtEpochMs, updatedAtEpochMs
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      title,
+      blank(body.workTitle) || title,
+      blank(body.characterName) || title,
+      blank(body.seriesName) || '手動追加',
+      blank(body.maker) || '未設定',
+      blank(body.releaseText) || '未設定',
+      Number.isInteger(body.releaseYear) ? body.releaseYear : null,
+      Number.isInteger(body.releaseMonth) ? body.releaseMonth : null,
+      blank(body.sourceUrl),
+      blank(body.imageUrl),
+      createdAt,
+      createdAt
+    );
+    const after = getRow('prize_items', result.lastInsertRowid);
+    recordAudit('prize_items', result.lastInsertRowid, 'manual_insert', null, after, user.id);
+    return send(res, 201, getPrizeForUser(user.id, result.lastInsertRowid));
   }
 
   if (method === 'PATCH' && segments[0] === 'prizes' && segments[2] === 'status') {
@@ -797,10 +837,18 @@ async function handleApi(req, res, url) {
 
   if (method === 'DELETE' && segments[0] === 'prizes' && segments.length === 2) {
     const id = Number(segments[1]);
-    const before = getRow('prize_items', id);
-    if (!before) return sendError(res, 404, 'Prize not found');
-    db.prepare('DELETE FROM prize_items WHERE id = ?').run(id);
-    recordAudit('prize_items', id, 'delete', before, null, user.id);
+    if (!getRow('prize_items', id)) return sendError(res, 404, 'Prize not found');
+    const before = getUserState(user.id, id);
+    const updatedAt = now();
+    db.prepare(`
+      INSERT INTO user_prize_states (userId, prizeId, status, memo, acquiredAtEpochMs, createdAtEpochMs, updatedAtEpochMs)
+      VALUES (?, ?, 'hidden', NULL, NULL, ?, ?)
+      ON CONFLICT(userId, prizeId) DO UPDATE SET
+        status = 'hidden',
+        updatedAtEpochMs = excluded.updatedAtEpochMs
+    `).run(user.id, id, updatedAt, updatedAt);
+    const after = getUserState(user.id, id);
+    recordAudit('user_prize_states', id, 'hide', before, after, user.id);
     return send(res, 204, {});
   }
 
@@ -921,6 +969,118 @@ function blank(value) {
   if (typeof value !== 'string') return null;
   const trimmed = value.trim();
   return trimmed ? trimmed : null;
+}
+
+function htmlDecode(value) {
+  return value
+    .replace(/&amp;/g, '&')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/<[^>]+>/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function isPrizeCandidate(candidate) {
+  const text = `${candidate.title} ${candidate.snippet || ''} ${candidate.sourceUrl || ''}`.toLowerCase();
+  return [
+    'プライズ',
+    'prize',
+    '景品',
+    'クレーン',
+    'ufoキャッチャー',
+    'taito-prize',
+    'charahiroba',
+    'segaplaza',
+    'sega.jp/prize',
+    'bsp-prize',
+  ].some((term) => text.includes(term.toLowerCase()));
+}
+
+function resolveMaybeUrl(value, baseUrl) {
+  if (!value || value.startsWith('data:')) return null;
+  try {
+    return new URL(htmlDecode(value), baseUrl).href;
+  } catch (_) {
+    return null;
+  }
+}
+
+async function findPageImage(sourceUrl) {
+  if (!sourceUrl) return null;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 4000);
+  try {
+    const response = await fetch(sourceUrl, {
+      signal: controller.signal,
+      headers: {
+        'user-agent': 'FigureList/1.0 prize image lookup',
+        accept: 'text/html,*/*',
+      },
+    });
+    const html = await response.text();
+    const meta = html.match(/<meta[^>]+(?:property|name)=["'](?:og:image|twitter:image)["'][^>]+content=["']([^"']+)["'][^>]*>/i)
+      || html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+(?:property|name)=["'](?:og:image|twitter:image)["'][^>]*>/i);
+    const image = resolveMaybeUrl(meta?.[1], sourceUrl);
+    if (image) return image;
+    const img = html.match(/<img[^>]+(?:src|data-src)=["']([^"']+)["'][^>]*>/i);
+    return resolveMaybeUrl(img?.[1], sourceUrl);
+  } catch (_) {
+    return null;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function searchPrizeCandidates(trimmed) {
+  const searchUrl = `https://duckduckgo.com/html/?q=${encodeURIComponent(`${trimmed} プライズ フィギュア`)}`;
+  try {
+    const response = await fetch(searchUrl, {
+      headers: {
+        'user-agent': 'FigureList/1.0 prize search',
+        accept: 'text/html,*/*',
+      },
+    });
+    const html = await response.text();
+    const candidates = [];
+    const resultPattern = /<a[^>]+class="result__a"[^>]+href="([^"]+)"[^>]*>([\s\S]*?)<\/a>[\s\S]*?<a[^>]+class="result__snippet"[^>]*>([\s\S]*?)<\/a>/g;
+    for (const match of html.matchAll(resultPattern)) {
+      const url = new URL(htmlDecode(match[1]), searchUrl);
+      const redirect = url.searchParams.get('uddg');
+      const candidate = {
+        title: htmlDecode(match[2]),
+        sourceUrl: redirect ? decodeURIComponent(redirect) : url.href,
+        snippet: htmlDecode(match[3]),
+      };
+      if (!isPrizeCandidate(candidate)) continue;
+      candidates.push(candidate);
+      if (candidates.length >= 8) break;
+    }
+    if (candidates.length > 0) {
+      return await Promise.all(candidates.map(async (candidate) => ({
+        ...candidate,
+        imageUrl: await findPageImage(candidate.sourceUrl),
+      })));
+    }
+  } catch (_) {
+    // Fall through to a manual candidate.
+  }
+  return [
+    {
+      title: trimmed,
+      sourceUrl: searchUrl,
+      snippet: 'プライズ候補を取得できませんでした。手動追加用の候補です。',
+      imageUrl: null,
+    },
+  ];
+}
+
+async function searchFigureCandidates(query) {
+  const trimmed = blank(query);
+  if (!trimmed) return [];
+  return searchPrizeCandidates(trimmed);
 }
 
 function serveStatic(res, pathname) {

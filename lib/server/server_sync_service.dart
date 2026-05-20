@@ -18,6 +18,20 @@ class ServerSyncException implements Exception {
   String toString() => message;
 }
 
+class FigureSearchResult {
+  const FigureSearchResult({
+    required this.title,
+    this.sourceUrl,
+    this.snippet,
+    this.imageUrl,
+  });
+
+  final String title;
+  final String? sourceUrl;
+  final String? snippet;
+  final String? imageUrl;
+}
+
 class ServerSyncService {
   ServerSyncService(this._database);
 
@@ -157,13 +171,22 @@ class ServerSyncService {
 
   Future<int> syncFromServer() async {
     _requireLogin();
-    final response = await _client.get(_appUri('/api/prizes'), headers: _headers);
+    final response = await _client.get(
+      _appUri('/api/prizes?includeHidden=1'),
+      headers: _headers,
+    );
     _throwIfFailed(response);
     final prizes = (jsonDecode(response.body) as List<dynamic>)
         .cast<Map<String, dynamic>>();
 
     await _database.transaction(() async {
       for (final prize in prizes) {
+        if (prize['status'] == 'hidden') {
+          await (_database.delete(_database.prizeItems)
+                ..where((t) => t.id.equals(prize['id'] as int)))
+              .go();
+          continue;
+        }
         await _database
             .into(_database.prizeItems)
             .insertOnConflictUpdate(_prizeCompanion(prize));
@@ -235,6 +258,65 @@ class ServerSyncService {
         'costYen': costYen,
         'memo': memo,
       }),
+    );
+    _throwIfFailed(response);
+  }
+
+  Future<List<FigureSearchResult>> searchFigures(String query) async {
+    _requireLogin();
+    final response = await _client.get(
+      _appUri('/api/figure-search?q=${Uri.encodeQueryComponent(query)}'),
+      headers: _headers,
+    );
+    _throwIfFailed(response);
+    return (jsonDecode(response.body) as List<dynamic>)
+        .cast<Map<String, dynamic>>()
+        .map(
+          (json) => FigureSearchResult(
+            title: json['title'] as String,
+            sourceUrl: json['sourceUrl'] as String?,
+            snippet: json['snippet'] as String?,
+            imageUrl: _absoluteImageUrl(json['imageUrl'] as String?),
+          ),
+        )
+        .toList(growable: false);
+  }
+
+  Future<int> createFigure({
+    required String title,
+    String? workTitle,
+    String? characterName,
+    String? seriesName,
+    String? maker,
+    String? releaseText,
+    String? sourceUrl,
+    String? imageUrl,
+  }) async {
+    _requireLogin();
+    final response = await _client.post(
+      _appUri('/api/prizes'),
+      headers: _headers,
+      body: jsonEncode({
+        'title': title,
+        'workTitle': workTitle,
+        'characterName': characterName,
+        'seriesName': seriesName,
+        'maker': maker,
+        'releaseText': releaseText,
+        'sourceUrl': sourceUrl,
+        'imageUrl': imageUrl,
+      }),
+    );
+    _throwIfFailed(response);
+    final body = jsonDecode(response.body) as Map<String, dynamic>;
+    return body['id'] as int;
+  }
+
+  Future<void> hidePrize(int prizeId) async {
+    if (!isLoggedIn) return;
+    final response = await _client.delete(
+      _appUri('/api/prizes/$prizeId'),
+      headers: _headers,
     );
     _throwIfFailed(response);
   }

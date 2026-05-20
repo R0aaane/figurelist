@@ -216,6 +216,73 @@ async function loadAudit() {
   renderAudit(logs);
 }
 
+async function searchFigures() {
+  const query = $('#figureSearchInput').value.trim();
+  if (!query) return;
+  const results = await api(`/api/figure-search?q=${encodeURIComponent(query)}`);
+  renderFigureSearchResults(results);
+}
+
+function renderFigureSearchResults(results) {
+  const container = $('#figureSearchResults');
+  if (!results.length) {
+    container.innerHTML = '<div class="searchResult">候補が見つかりませんでした</div>';
+    return;
+  }
+  container.innerHTML = results.map((result, index) => `
+    <article class="searchResult">
+      ${result.imageUrl ? `<img class="searchResultImage" src="${escapeHtml(result.imageUrl)}" alt="">` : '<div class="searchResultImage placeholder"></div>'}
+      <div>
+        <strong>${escapeHtml(result.title)}</strong>
+        <div class="meta">
+          ${escapeHtml(result.snippet || '')}<br>
+          ${result.sourceUrl ? `<a href="${escapeHtml(result.sourceUrl)}" target="_blank" rel="noreferrer">${escapeHtml(result.sourceUrl)}</a>` : ''}
+        </div>
+      </div>
+      <button class="actionButton primary" data-add-search-result="${index}">追加</button>
+    </article>
+  `).join('');
+  container.dataset.results = JSON.stringify(results);
+}
+
+async function addFigureFromSearch(index) {
+  const results = JSON.parse($('#figureSearchResults').dataset.results || '[]');
+  const result = results[index];
+  if (!result) return;
+  await createFigure({
+    title: result.title,
+    workTitle: $('#figureSearchInput').value.trim() || result.title,
+    characterName: $('#figureSearchInput').value.trim() || result.title,
+    seriesName: '検索追加',
+    maker: '未設定',
+    releaseText: '未設定',
+    sourceUrl: result.sourceUrl,
+    imageUrl: result.imageUrl,
+  });
+}
+
+async function addManualFigure() {
+  const title = $('#figureSearchInput').value.trim() || prompt('追加するフィギュア名');
+  if (!title) return;
+  await createFigure({
+    title,
+    workTitle: title,
+    characterName: title,
+    seriesName: '手動追加',
+    maker: '未設定',
+    releaseText: '未設定',
+  });
+}
+
+async function createFigure(payload) {
+  await api('/api/prizes', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+  $('#figureSearchResults').innerHTML = '';
+  await loadAll();
+}
+
 function renderStoreFilter() {
   const select = $('#storeFilter');
   const current = select.value;
@@ -483,6 +550,22 @@ function bindEvents() {
       return;
     }
 
+    if (target.id === 'figureSearchButton') {
+      await searchFigures();
+      return;
+    }
+
+    if (target.id === 'manualAddButton') {
+      await addManualFigure();
+      return;
+    }
+
+    const addSearchResult = target.closest('[data-add-search-result]');
+    if (addSearchResult) {
+      await addFigureFromSearch(Number(addSearchResult.dataset.addSearchResult));
+      return;
+    }
+
     if (target.id === 'startServerButton' && state.user?.isAdmin) return startServer();
     if (target.id === 'stopServerButton' && state.user?.isAdmin) return stopServer();
 
@@ -587,6 +670,9 @@ function bindEvents() {
 
   $('#authPassword').addEventListener('keydown', (event) => {
     if (event.key === 'Enter') loginOrRegister('login');
+  });
+  $('#figureSearchInput').addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') searchFigures();
   });
   $('#characterFilter').addEventListener('input', debounce(loadPrizes, 180));
   $('#seriesFilter').addEventListener('input', debounce(loadPrizes, 180));

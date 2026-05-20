@@ -197,7 +197,8 @@ textarea {
 }
 
 .list,
-.auditList {
+.auditList,
+.searchResults {
   display: grid;
   gap: 10px;
   margin-top: 12px;
@@ -205,13 +206,46 @@ textarea {
 
 .prizeCard,
 .storeCard,
-.auditItem {
+.auditItem,
+.searchResult {
   display: grid;
   gap: 12px;
   padding: 12px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--surface);
+}
+
+.searchResult {
+  grid-template-columns: 72px minmax(0, 1fr) auto;
+  align-items: center;
+}
+
+.searchResultImage {
+  width: 72px;
+  aspect-ratio: 1;
+  object-fit: contain;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-2);
+}
+
+.searchResultImage.placeholder {
+  display: block;
+}
+
+.addPanel {
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.addPanel .actions {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) auto auto;
+  gap: 10px;
 }
 
 .prizeCard {
