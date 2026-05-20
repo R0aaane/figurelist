@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>FigureList Web</title>
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <header class="topbar">
+      <div>
+        <h1>プライズ収集管理</h1>
+        <p id="dbStatus">SQLiteサーバー同期中</p>
+      </div>
+      <nav class="tabs" aria-label="表示切替">
+        <button class="tab active" data-view="prizes">一覧</button>
+        <button class="tab" data-view="stores">店舗</button>
+        <button class="tab" data-view="members">メンバー</button>
+        <button class="tab" data-view="audit">変更記録</button>
+      </nav>
+      <div class="serverControls" aria-label="server controls">
+        <span id="userStatus">Guest</span>
+        <button id="logoutButton" class="actionButton">Logout</button>
+        <span id="serverStatus">Server checking</span>
+        <button id="startServerButton" class="actionButton">Start</button>
+        <button id="stopServerButton" class="actionButton">Stop</button>
+        <a id="controlLink" class="actionLink" href="http://localhost:4172" target="_blank" rel="noreferrer">Control</a>
+      </div>
+    </header>
+
+    <section id="authPanel" class="authPanel hidden">
+      <div class="authCard">
+        <h2>Login / Register</h2>
+        <label class="field">
+          <span>Username</span>
+          <input id="authUsername" autocomplete="username">
+        </label>
+        <label class="field">
+          <span>Password</span>
+          <input id="authPassword" type="password" autocomplete="current-password">
+        </label>
+        <div class="actions">
+          <button id="loginButton" class="actionButton primary">Login</button>
+          <button id="registerButton" class="actionButton">Register</button>
+        </div>
+        <p id="authMessage" class="meta"></p>
+      </div>
+    </section>
+
+    <main>
+      <section id="prizesView" class="view">
+        <div class="toolbar">
+          <div class="segmented" id="statusFilter">
+            <button data-status="" class="active">すべて</button>
+            <button data-status="unowned">未獲得</button>
+            <button data-status="owned">獲得済み</button>
+            <button data-status="reserved">獲得予定</button>
+            <button data-status="skipped">見送り</button>
+          </div>
+          <label class="field">
+            <span>店舗</span>
+            <select id="storeFilter"></select>
+          </label>
+          <label class="field">
+            <span>キャラ名検索</span>
+            <input id="characterFilter" list="characterSuggestions" autocomplete="off">
+            <datalist id="characterSuggestions"></datalist>
+          </label>
+          <label class="field">
+            <span>シリーズ検索</span>
+            <input id="seriesFilter" list="seriesSuggestions" autocomplete="off">
+            <datalist id="seriesSuggestions"></datalist>
+          </label>
+          <button id="syncButton" class="iconButton" title="サンプル登録">↻</button>
+        </div>
+        <div id="prizeList" class="list"></div>
+      </section>
+
+      <section id="storesView" class="view hidden">
+        <div id="storeList" class="list"></div>
+      </section>
+
+      <section id="membersView" class="view hidden">
+        <div id="memberList" class="list"></div>
+      </section>
+
+      <section id="auditView" class="view hidden">
+        <div id="auditList" class="auditList"></div>
+      </section>
+    </main>
+
+    <aside id="detailPanel" class="detailPanel hidden" aria-label="詳細">
+      <div class="detailHeader">
+        <h2 id="detailTitle">詳細</h2>
+        <button id="closeDetail" class="iconButton" title="閉じる">×</button>
+      </div>
+      <div id="detailContent"></div>
+    </aside>
+
+    <script src="/app.js"></script>
+  </body>
+</html>

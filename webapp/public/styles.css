@@ -1,0 +1,394 @@
+:root {
+  color-scheme: dark;
+  --bg: #07101f;
+  --surface: #101a2b;
+  --surface-2: #16243a;
+  --line: #2f486b;
+  --text: #edf4ff;
+  --muted: #a8b8d1;
+  --primary: #78b7ff;
+  --good: #7bd88f;
+  --warn: #ffd166;
+  --danger: #ff8f8f;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Segoe UI", system-ui, sans-serif;
+  letter-spacing: 0;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 18px;
+  background: rgba(7, 16, 31, 0.96);
+  border-bottom: 1px solid var(--line);
+}
+
+h1,
+h2,
+h3,
+p {
+  margin: 0;
+}
+
+h1 {
+  font-size: 22px;
+  font-weight: 700;
+}
+
+#dbStatus {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.tabs,
+.segmented,
+.serverControls {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.tab,
+.segmented button,
+.iconButton,
+.actionButton,
+.actionLink {
+  min-height: 36px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.tab,
+.segmented button,
+.actionButton,
+.actionLink {
+  padding: 0 12px;
+}
+
+.actionLink {
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+}
+
+.serverControls {
+  align-items: center;
+}
+
+#serverStatus {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.iconButton {
+  width: 38px;
+  padding: 0;
+  font-size: 20px;
+}
+
+.tab.active,
+.segmented button.active,
+.actionButton.primary {
+  border-color: var(--primary);
+  background: #17385d;
+}
+
+main {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 16px;
+}
+
+.authPanel {
+  max-width: 460px;
+  margin: 32px auto;
+  padding: 0 16px;
+}
+
+.authCard {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.fileButton {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.fileButton input {
+  display: none;
+}
+
+.hidden {
+  display: none !important;
+}
+
+.toolbar {
+  display: grid;
+  grid-template-columns: minmax(260px, 1.4fr) minmax(160px, 0.7fr) minmax(180px, 1fr) minmax(180px, 1fr) auto;
+  gap: 10px;
+  align-items: end;
+  padding: 12px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.field {
+  display: grid;
+  gap: 5px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+input,
+select,
+textarea {
+  width: 100%;
+  min-height: 38px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #0b1424;
+  color: var(--text);
+  padding: 8px 10px;
+}
+
+.list,
+.auditList {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.prizeCard,
+.storeCard,
+.auditItem {
+  display: grid;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.prizeCard {
+  grid-template-columns: 118px minmax(0, 1fr) auto;
+  align-items: start;
+}
+
+.prizeCard img,
+.imageFallback {
+  width: 118px;
+  aspect-ratio: 1;
+  border-radius: 6px;
+  object-fit: cover;
+  background: var(--surface-2);
+}
+
+.imageFallback {
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+}
+
+.prizeTitle {
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.meta {
+  margin-top: 6px;
+  color: var(--muted);
+  line-height: 1.5;
+  font-size: 13px;
+}
+
+.chips {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+.chip {
+  padding: 4px 8px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 12px;
+}
+
+.chip.owned {
+  border-color: var(--good);
+}
+
+.chip.reserved {
+  border-color: var(--warn);
+}
+
+.chip.skipped {
+  border-color: var(--danger);
+}
+
+.cardActions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 128px;
+}
+
+.detailPanel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  z-index: 10;
+  width: min(560px, 100vw);
+  height: 100vh;
+  overflow: auto;
+  background: #0a1323;
+  border-left: 1px solid var(--line);
+  box-shadow: -20px 0 50px rgba(0, 0, 0, 0.35);
+}
+
+.detailHeader {
+  position: sticky;
+  top: 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+  background: #0a1323;
+  border-bottom: 1px solid var(--line);
+}
+
+#detailContent {
+  display: grid;
+  gap: 16px;
+  padding: 14px;
+}
+
+.detailImage {
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  object-fit: contain;
+  background: var(--surface);
+  border-radius: 8px;
+}
+
+.formGrid {
+  display: grid;
+  gap: 10px;
+}
+
+.twoCols {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.logRow,
+.appearanceRow {
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.storeCard {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+}
+
+.switch {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.switch input {
+  width: 22px;
+  min-height: 22px;
+}
+
+.auditItem pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  margin: 0;
+  padding: 10px;
+  border-radius: 8px;
+  background: #08101d;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+@media (max-width: 840px) {
+  .topbar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .toolbar {
+    grid-template-columns: 1fr;
+  }
+
+  .prizeCard {
+    grid-template-columns: 76px minmax(0, 1fr);
+  }
+
+  .prizeCard img,
+  .imageFallback {
+    width: 76px;
+  }
+
+  .cardActions {
+    grid-column: 1 / -1;
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+}

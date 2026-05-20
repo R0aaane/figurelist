@@ -1,0 +1,105 @@
+# OS/editor files
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*.tmp
+*.temp
+.history/
+
+# IDEs
+.idea/
+*.iml
+*.ipr
+*.iws
+
+# VS Code settings are often useful to commit when shared by the team.
+# Uncomment the next line if this should stay fully local.
+# .vscode/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Dart / Flutter
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+build/
+coverage/
+**/doc/api/
+**/ios/Flutter/.last_build_id
+
+# Flutter release artifacts
+app.*.symbols
+app.*.map.json
+
+# Android / Gradle
+.gradle/
+android/.gradle/
+android/local.properties
+android/captures/
+android/app/debug/
+android/app/profile/
+android/app/release/
+android/app/**/*.apk
+android/app/**/*.aab
+android/key.properties
+android/**/*.keystore
+android/**/*.jks
+
+# Apple platforms
+ios/Flutter/ephemeral/
+ios/Flutter/Generated.xcconfig
+ios/Flutter/flutter_export_environment.sh
+ios/Flutter/App.framework
+ios/Flutter/Flutter.framework
+ios/Flutter/Flutter.podspec
+ios/Flutter/flutter_assets/
+ios/Runner/GeneratedPluginRegistrant.*
+ios/Pods/
+ios/.symlinks/
+ios/DerivedData/
+ios/**/xcuserdata/
+macos/Flutter/ephemeral/
+macos/Flutter/GeneratedPluginRegistrant.swift
+macos/Pods/
+macos/.symlinks/
+macos/DerivedData/
+macos/**/xcuserdata/
+
+# Desktop Flutter generated build state
+linux/flutter/ephemeral/
+macos/Flutter/ephemeral/
+windows/flutter/ephemeral/
+
+# Visual Studio / Windows
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+windows/**/x64/
+windows/**/x86/
+windows/**/*.cache
+!windows/**/*.cache/
+
+# Node webapp
+webapp/node_modules/
+webapp/.npm/
+webapp/.pnpm-store/
+webapp/dist/
+webapp/build/
+webapp/coverage/
+
+# Local runtime data and secrets
+.env
+.env.*
+!.env.example
+webapp/data/*.sqlite
+webapp/data/*.sqlite-*
