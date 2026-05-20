@@ -55,6 +55,9 @@ SQLiteファイルは `webapp\data\figurelist.sqlite` に作成されます。
 
 `メンバー` タブでは、各ユーザーの獲得済み・獲得予定・見送りの件数と対象プライズを確認できます。
 
+`メンバー` タブと `変更記録` タブは、username が `admin` のユーザーだけが閲覧できます。
+管理者を作る場合は、ログイン画面で username に `admin` を指定して `Register` してください。
+
 ## 箱画像修正
 
 詳細画面の `箱画像URL` を変更して `箱画像URLを保存` を押すと、プライズ本体の画像URLが更新されます。
@@ -74,3 +77,43 @@ SQLiteファイルは `webapp\data\figurelist.sqlite` に作成されます。
 - 推測されにくい強いパスワード
 - DBファイルのバックアップ
 - 管理サーバー `4172` は外部公開しない
+
+## Cloudflare Tunnelで少人数に共有
+
+テスト用途ならCloudflare Quick Tunnelを使います。Cloudflare公式ドキュメントでは、Quick Tunnelは開発・検証用で、本番運用には通常のCloudflare Tunnel作成が推奨されています。
+
+1. `cloudflared` をインストールします。
+
+```powershell
+cd C:\_workspace\Flutter\FigureList\figurelist\webapp
+.\install_cloudflared_windows.ps1
+```
+
+PowerShellでスクリプト実行が無効な場合:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\install_cloudflared_windows.ps1
+```
+
+2. 新しいPowerShellを開き、トンネルを開始します。
+
+```powershell
+cd C:\_workspace\Flutter\FigureList\figurelist\webapp
+.\start_cloudflare_tunnel.ps1
+```
+
+PowerShellでスクリプト実行が無効な場合:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\start_cloudflare_tunnel.ps1
+```
+
+3. 画面に表示される `https://xxxxx.trycloudflare.com` のURLを仲間に共有します。
+
+注意:
+
+- 共有するのは `4173` のアプリ本体だけです。
+- 管理サーバー `4172` は公開しません。
+- PCをスリープさせる、PowerShellを閉じる、`Ctrl+C` で止めると共有URLは使えなくなります。
+- Quick TunnelのURLは毎回変わります。
+- 仲間には各自 `Register` でユーザー名とパスワードを作ってもらってください。

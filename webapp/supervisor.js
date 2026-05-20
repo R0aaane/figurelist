@@ -48,6 +48,14 @@ function stopApp() {
   return { stopped: true, running: false, pid };
 }
 
+function restartApp() {
+  const stopped = stopApp();
+  setTimeout(() => {
+    startApp();
+  }, 1200);
+  return { restarting: true, stopped };
+}
+
 function send(res, status, value) {
   res.writeHead(status, {
     'content-type': 'application/json; charset=utf-8',
@@ -129,6 +137,9 @@ const controlServer = http.createServer((req, res) => {
   }
   if (req.method === 'POST' && url.pathname === '/api/server/stop') {
     return send(res, 200, stopApp());
+  }
+  if (req.method === 'POST' && url.pathname === '/api/server/restart') {
+    return send(res, 200, restartApp());
   }
   send(res, 404, { error: 'Not found' });
 });

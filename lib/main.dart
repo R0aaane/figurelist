@@ -4,6 +4,7 @@ import 'data/app_database.dart';
 import 'prizes/prize_list_page.dart';
 import 'prizes/prize_notification_service.dart';
 import 'prizes/prize_repository.dart';
+import 'server/server_sync_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -24,12 +25,14 @@ class MyApp extends StatefulWidget {
 class _MyAppState extends State<MyApp> {
   late final AppDatabase _database;
   late final PrizeRepository _repository;
+  late final ServerSyncService _serverSyncService;
 
   @override
   void initState() {
     super.initState();
     _database = AppDatabase();
     _repository = PrizeRepository(_database);
+    _serverSyncService = ServerSyncService(_database);
   }
 
   @override
@@ -84,6 +87,7 @@ class _MyAppState extends State<MyApp> {
       home: PrizeListPage(
         repository: _repository,
         notificationService: widget.notificationService,
+        serverSyncService: _serverSyncService,
       ),
     );
   }

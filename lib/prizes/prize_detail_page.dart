@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../data/app_database.dart';
+import '../server/server_sync_service.dart';
 import 'prize_notification_service.dart';
 import 'prize_repository.dart';
 import 'prize_status_chip.dart';
@@ -12,11 +13,13 @@ class PrizeDetailPage extends StatefulWidget {
     required this.repository,
     required this.notificationService,
     required this.prizeId,
+    this.serverSyncService,
   });
 
   final PrizeRepository repository;
   final PrizeNotificationService notificationService;
   final int prizeId;
+  final ServerSyncService? serverSyncService;
 
   @override
   State<PrizeDetailPage> createState() => _PrizeDetailPageState();
@@ -25,6 +28,14 @@ class PrizeDetailPage extends StatefulWidget {
 class _PrizeDetailPageState extends State<PrizeDetailPage> {
   final _memoController = TextEditingController();
   bool _memoInitialized = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      widget.serverSyncService?.syncPrizeDetailFromServer(widget.prizeId);
+    });
+  }
 
   @override
   void dispose() {
@@ -104,6 +115,10 @@ class _PrizeDetailPageState extends State<PrizeDetailPage> {
                         ? null
                         : () async {
                             await widget.repository.markOwned(prize.id);
+                            await widget.serverSyncService?.updateStatus(
+                              prize.id,
+                              PrizeStatus.owned,
+                            );
                             await widget.notificationService
                                 .rescheduleArrivalNotifications(
                                   widget.repository,
@@ -119,6 +134,10 @@ class _PrizeDetailPageState extends State<PrizeDetailPage> {
                         ? null
                         : () async {
                             await widget.repository.updateStatus(
+                              prize.id,
+                              PrizeStatus.unowned,
+                            );
+                            await widget.serverSyncService?.updateStatus(
                               prize.id,
                               PrizeStatus.unowned,
                             );
@@ -167,6 +186,7 @@ class _PrizeDetailPageState extends State<PrizeDetailPage> {
                 onChanged: (value) {
                   if (value != null) {
                     widget.repository.updateStatus(prize.id, value).then((_) {
+                      widget.serverSyncService?.updateStatus(prize.id, value);
                       widget.notificationService.rescheduleArrivalNotifications(
                         widget.repository,
                       );
@@ -191,6 +211,11 @@ class _PrizeDetailPageState extends State<PrizeDetailPage> {
                   onPressed: () => widget.repository.updateMemo(
                     prize.id,
                     _memoController.text,
+                  ).then(
+                    (_) => widget.serverSyncService?.updateMemo(
+                      prize.id,
+                      _memoController.text,
+                    ),
                   ),
                   icon: const Icon(Icons.save),
                   label: const Text('\u30e1\u30e2\u3092\u4fdd\u5b58'),

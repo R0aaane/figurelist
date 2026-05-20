@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../data/app_database.dart';
+import '../server/server_account_page.dart';
+import '../server/server_sync_service.dart';
 import 'prize_detail_page.dart';
 import 'prize_notification_service.dart';
 import 'prize_repository.dart';
@@ -12,10 +14,12 @@ class PrizeListPage extends StatefulWidget {
     super.key,
     required this.repository,
     required this.notificationService,
+    this.serverSyncService,
   });
 
   final PrizeRepository repository;
   final PrizeNotificationService notificationService;
+  final ServerSyncService? serverSyncService;
 
   @override
   State<PrizeListPage> createState() => _PrizeListPageState();
@@ -66,6 +70,21 @@ class _PrizeListPageState extends State<PrizeListPage> {
       appBar: AppBar(
         title: const Text('\u30d7\u30e9\u30a4\u30ba\u53ce\u96c6\u7ba1\u7406'),
         actions: [
+          IconButton(
+            tooltip: 'サーバー同期',
+            onPressed: () {
+              final service = widget.serverSyncService;
+              if (service == null) {
+                return;
+              }
+              Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => ServerAccountPage(service: service),
+                ),
+              );
+            },
+            icon: const Icon(Icons.cloud_sync),
+          ),
           IconButton(
             tooltip: _density == _PrizeListDensity.compact
                 ? '\u30ea\u30b9\u30c8\u3092\u5927\u304d\u304f\u8868\u793a'
@@ -168,6 +187,7 @@ class _PrizeListPageState extends State<PrizeListPage> {
                                   repository: widget.repository,
                                   notificationService:
                                       widget.notificationService,
+                                  serverSyncService: widget.serverSyncService,
                                   prizeId: prize.id,
                                 ),
                               ),
@@ -175,6 +195,10 @@ class _PrizeListPageState extends State<PrizeListPage> {
                           },
                           onStatusSelected: (status) async {
                             await widget.repository.updateStatus(
+                              prize.id,
+                              status,
+                            );
+                            await widget.serverSyncService?.updateStatus(
                               prize.id,
                               status,
                             );
