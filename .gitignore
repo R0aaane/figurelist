@@ -103,3 +103,4 @@ webapp/coverage/
 !.env.example
 webapp/data/*.sqlite
 webapp/data/*.sqlite-*
+*.exe

@@ -170,8 +170,12 @@ class _ServerAccountPageState extends State<ServerAccountPage> {
   }
 
   void _saveUrls() {
-    widget.service.appBaseUrl = _appUrlController.text.trim();
-    widget.service.controlBaseUrl = _controlUrlController.text.trim();
+    widget.service.setBaseUrls(
+      appBaseUrl: _appUrlController.text,
+      controlBaseUrl: _controlUrlController.text,
+    );
+    _appUrlController.text = widget.service.appBaseUrl;
+    _controlUrlController.text = widget.service.controlBaseUrl;
     widget.service.saveSession();
   }
 }

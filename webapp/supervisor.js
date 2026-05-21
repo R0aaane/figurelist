@@ -7,7 +7,8 @@ const { URL } = require('node:url');
 const rootDir = __dirname;
 const appPort = Number(process.env.APP_PORT || 4173);
 const controlPort = Number(process.env.CONTROL_PORT || 4172);
-const appUrl = `http://localhost:${appPort}`;
+const loopbackHost = process.env.LOOPBACK_HOST || '127.0.0.1';
+const appUrl = `http://${loopbackHost}:${appPort}`;
 const logPath = path.join(rootDir, 'server.log');
 const errorLogPath = path.join(rootDir, 'server.err.log');
 
@@ -146,7 +147,7 @@ const controlServer = http.createServer((req, res) => {
 
 startApp();
 
-controlServer.listen(controlPort, () => {
-  console.log(`FigureList control server running at http://localhost:${controlPort}`);
+controlServer.listen(controlPort, loopbackHost, () => {
+  console.log(`FigureList control server running at http://${loopbackHost}:${controlPort}`);
   console.log(`FigureList app server target: ${appUrl}`);
 });

@@ -15,7 +15,7 @@ const statusLabels = {
 };
 
 const $ = (selector) => document.querySelector(selector);
-const controlBaseUrl = 'http://localhost:4172';
+const controlBaseUrl = 'http://127.0.0.1:4172';
 
 async function api(path, options = {}) {
   const response = await fetch(path, {
