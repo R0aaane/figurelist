@@ -93,9 +93,19 @@ windows/**/*.cache
 webapp/node_modules/
 webapp/.npm/
 webapp/.pnpm-store/
+webapp/.tmp/
+webapp/.tools/
 webapp/dist/
 webapp/build/
 webapp/coverage/
+webapp/*.log
+
+# Flutter web build output served by the local Node wrapper.
+# Keep hand-written wrapper assets tracked if they already exist here.
+webapp/public/*
+!webapp/public/
+!webapp/public/app.js
+!webapp/public/styles.css
 
 # Local runtime data and secrets
 .env
@@ -103,4 +113,5 @@ webapp/coverage/
 !.env.example
 webapp/data/*.sqlite
 webapp/data/*.sqlite-*
+webapp/public/uploads/
 *.exe
