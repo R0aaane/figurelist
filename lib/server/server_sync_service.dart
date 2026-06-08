@@ -37,6 +37,7 @@ class ServerSyncService {
 
   final AppDatabase _database;
   final _client = http.Client();
+  Process? _cloudflareProcess;
 
   String appBaseUrl = 'http://127.0.0.1:4173';
   String controlBaseUrl = 'http://127.0.0.1:4172';
@@ -185,6 +186,96 @@ class ServerSyncService {
   Future<void> stopServer() async {
     final response = await _client.post(_controlUri('/api/server/stop'));
     _throwIfFailed(response);
+  }
+
+  bool get isCloudflareTunnelRunning {
+    return _cloudflareProcess != null;
+  }
+
+  Future<String> startCloudflareTunnel({bool rebuild = true}) async {
+    final existing = _cloudflareProcess;
+    if (existing != null) {
+      throw const ServerSyncException('Cloudflare Tunnel is already running.');
+    }
+
+    final webappDirectory = await _findWebappDirectory();
+    if (webappDirectory == null) {
+      throw const ServerSyncException('webapp folder was not found.');
+    }
+
+    final script = File(
+      p.join(webappDirectory.path, 'start_cloudflare_tunnel.ps1'),
+    );
+    if (!await script.exists()) {
+      throw const ServerSyncException(
+        'start_cloudflare_tunnel.ps1 was not found.',
+      );
+    }
+
+    final args = [
+      '-NoProfile',
+      '-ExecutionPolicy',
+      'Bypass',
+      '-File',
+      script.path,
+      if (!rebuild) '-SkipBuild',
+    ];
+
+    final process = await Process.start(
+      'powershell.exe',
+      args,
+      workingDirectory: webappDirectory.path,
+      mode: ProcessStartMode.normal,
+    );
+    _cloudflareProcess = process;
+    process.exitCode.then((_) {
+      if (identical(_cloudflareProcess, process)) {
+        _cloudflareProcess = null;
+      }
+    });
+
+    final completer = Completer<String>();
+    final output = StringBuffer();
+    final urlPattern = RegExp(r'https://[a-z0-9-]+\.trycloudflare\.com');
+
+    void consume(List<int> bytes) {
+      final text = utf8.decode(bytes, allowMalformed: true);
+      output.write(text);
+      final match = urlPattern.firstMatch(output.toString());
+      if (match != null && !completer.isCompleted) {
+        completer.complete(match.group(0)!);
+      }
+    }
+
+    process.stdout.listen(consume);
+    process.stderr.listen(consume);
+
+    process.exitCode.then((code) {
+      if (!completer.isCompleted) {
+        _cloudflareProcess = null;
+        completer.completeError(
+          ServerSyncException(
+            'Cloudflare Tunnel failed with exit code $code.\n$output',
+          ),
+        );
+      }
+    });
+
+    return completer.future.timeout(
+      const Duration(minutes: 3),
+      onTimeout: () {
+        stopCloudflareTunnel();
+        throw ServerSyncException(
+          'Cloudflare Tunnel URL was not reported within 3 minutes.\n$output',
+        );
+      },
+    );
+  }
+
+  Future<void> stopCloudflareTunnel() async {
+    final process = _cloudflareProcess;
+    _cloudflareProcess = null;
+    process?.kill();
   }
 
   Future<int> syncFromServer() async {
@@ -413,9 +504,9 @@ class ServerSyncService {
   }
 
   Future<bool> _startLocalControlServer() async {
-    final script = File(
-      p.join(Directory.current.path, 'webapp', 'supervisor.js'),
-    );
+    final webappDirectory = await _findWebappDirectory();
+    if (webappDirectory == null) return false;
+    final script = File(p.join(webappDirectory.path, 'supervisor.js'));
     if (!await script.exists()) return false;
 
     try {
@@ -429,6 +520,28 @@ class ServerSyncService {
     } on Object {
       return false;
     }
+  }
+
+  Future<Directory?> _findWebappDirectory() async {
+    final candidates = <Directory>[
+      Directory(p.join(Directory.current.path, 'webapp')),
+      Directory(p.join(p.dirname(Platform.resolvedExecutable), 'webapp')),
+    ];
+
+    var current = Directory.current;
+    for (var i = 0; i < 6; i++) {
+      candidates.add(Directory(p.join(current.path, 'webapp')));
+      final parent = current.parent;
+      if (parent.path == current.path) break;
+      current = parent;
+    }
+
+    for (final candidate in candidates) {
+      if (await File(p.join(candidate.path, 'supervisor.js')).exists()) {
+        return candidate;
+      }
+    }
+    return null;
   }
 
   Future<File> _sessionFile() async {

@@ -18,6 +18,7 @@ class _ServerAccountPageState extends State<ServerAccountPage> {
   final _passwordController = TextEditingController();
   bool _busy = false;
   String? _message;
+  String? _cloudflareUrl;
 
   @override
   void initState() {
@@ -102,11 +103,27 @@ class _ServerAccountPageState extends State<ServerAccountPage> {
                 icon: const Icon(Icons.restart_alt),
                 label: const Text('サーバー再起動'),
               ),
+              FilledButton.icon(
+                onPressed: _busy ? null : _startCloudflare,
+                icon: const Icon(Icons.cloud_upload_outlined),
+                label: const Text('Cloudflare公開'),
+              ),
+              OutlinedButton.icon(
+                onPressed: _busy || !widget.service.isCloudflareTunnelRunning
+                    ? null
+                    : _stopCloudflare,
+                icon: const Icon(Icons.cloud_off_outlined),
+                label: const Text('Cloudflare停止'),
+              ),
             ],
           ),
           const SizedBox(height: 16),
           if (widget.service.isLoggedIn)
             Text('ログイン中: ${widget.service.username}'),
+          if (_cloudflareUrl != null) ...[
+            const SizedBox(height: 12),
+            SelectableText('Cloudflare URL: $_cloudflareUrl'),
+          ],
           if (_busy) const LinearProgressIndicator(),
           if (_message != null) ...[
             const SizedBox(height: 12),
@@ -151,6 +168,27 @@ class _ServerAccountPageState extends State<ServerAccountPage> {
       await Future<void>.delayed(const Duration(seconds: 2));
       await widget.service.startServer();
       return 'サーバーを再起動しました。';
+    });
+  }
+
+  Future<void> _startCloudflare() async {
+    await _run(() async {
+      _saveUrls();
+      final url = await widget.service.startCloudflareTunnel();
+      if (mounted) {
+        setState(() => _cloudflareUrl = url);
+      }
+      return 'Cloudflare Tunnel started: $url';
+    });
+  }
+
+  Future<void> _stopCloudflare() async {
+    await _run(() async {
+      await widget.service.stopCloudflareTunnel();
+      if (mounted) {
+        setState(() => _cloudflareUrl = null);
+      }
+      return 'Cloudflare Tunnel stopped.';
     });
   }
 

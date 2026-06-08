@@ -1,3 +1,7 @@
+param(
+  [switch]$SkipBuild
+)
+
 $ErrorActionPreference = 'Stop'
 
 $root = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -6,8 +10,14 @@ if ([string]::IsNullOrWhiteSpace($appUrl)) {
   $appUrl = 'http://127.0.0.1:4173'
 }
 
+$buildScript = Join-Path $root 'build_flutter_web.ps1'
 $installScript = Join-Path $root 'install_cloudflared_windows.ps1'
 $cloudflaredPath = Join-Path $root '.tools\cloudflared.exe'
+
+if (-not $SkipBuild) {
+  Write-Host "Building Flutter web assets..."
+  & $buildScript
+}
 
 if (-not (Test-Path -LiteralPath $cloudflaredPath)) {
   & $installScript

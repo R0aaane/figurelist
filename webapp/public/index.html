@@ -1,110 +1,46 @@
-<!doctype html>
-<html lang="ja">
-  <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>FigureList Web</title>
-    <link rel="stylesheet" href="/styles.css">
-  </head>
-  <body>
-    <header class="topbar">
-      <div>
-        <h1>プライズ収集管理</h1>
-        <p id="dbStatus">SQLiteサーバー同期中</p>
-      </div>
-      <nav class="tabs" aria-label="表示切替">
-        <button class="tab active" data-view="prizes">一覧</button>
-        <button class="tab" data-view="stores">店舗</button>
-        <button class="tab adminOnly hidden" data-view="members">メンバー</button>
-        <button class="tab adminOnly hidden" data-view="audit">変更記録</button>
-      </nav>
-      <div class="serverControls" aria-label="server controls">
-        <span id="userStatus">Guest</span>
-        <button id="logoutButton" class="actionButton" disabled>Logout</button>
-        <span id="serverStatus" class="adminOnly hidden">Server checking</span>
-        <button id="startServerButton" class="actionButton adminOnly hidden">Start</button>
-        <button id="stopServerButton" class="actionButton adminOnly hidden">Stop</button>
-        <a id="controlLink" class="actionLink adminOnly hidden" href="http://localhost:4172" target="_blank" rel="noreferrer">Control</a>
-      </div>
-    </header>
+<!DOCTYPE html>
+<html>
+<head>
+  <!--
+    If you are serving your web app in a path other than the root, change the
+    href value below to reflect the base path you are serving from.
 
-    <section id="authPanel" class="authPanel hidden">
-      <div class="authCard">
-        <h2>Login / Register</h2>
-        <label class="field">
-          <span>Username</span>
-          <input id="authUsername" autocomplete="username">
-        </label>
-        <label class="field">
-          <span>Password</span>
-          <input id="authPassword" type="password" autocomplete="current-password">
-        </label>
-        <div class="actions">
-          <button id="loginButton" class="actionButton primary">Login</button>
-          <button id="registerButton" class="actionButton">Register</button>
-        </div>
-        <p id="authMessage" class="meta"></p>
-      </div>
-    </section>
+    The path provided below has to start and end with a slash "/" in order for
+    it to work correctly.
 
-    <main class="hidden">
-      <section id="prizesView" class="view">
-        <div class="toolbar">
-          <div class="segmented" id="statusFilter">
-            <button data-status="" class="active">すべて</button>
-            <button data-status="unowned">未獲得</button>
-            <button data-status="owned">獲得済み</button>
-            <button data-status="reserved">獲得予定</button>
-            <button data-status="skipped">見送り</button>
-          </div>
-          <label class="field">
-            <span>店舗</span>
-            <select id="storeFilter"></select>
-          </label>
-          <label class="field">
-            <span>キャラ名検索</span>
-            <input id="characterFilter" list="characterSuggestions" autocomplete="off">
-            <datalist id="characterSuggestions"></datalist>
-          </label>
-          <label class="field">
-            <span>シリーズ検索</span>
-            <input id="seriesFilter" list="seriesSuggestions" autocomplete="off">
-            <datalist id="seriesSuggestions"></datalist>
-          </label>
-          <button id="syncButton" class="iconButton" title="サンプル登録">↻</button>
-        </div>
-        <section class="addPanel">
-          <div class="actions">
-            <input id="figureSearchInput" placeholder="追加したいフィギュア名を検索">
-            <button id="figureSearchButton" class="actionButton primary">検索</button>
-            <button id="manualAddButton" class="actionButton">手動追加</button>
-          </div>
-          <div id="figureSearchResults" class="searchResults"></div>
-        </section>
-        <div id="prizeList" class="list"></div>
-      </section>
+    For more details:
+    * https://developer.mozilla.org/en-US/docs/Web/HTML/Element/base
 
-      <section id="storesView" class="view hidden">
-        <div id="storeList" class="list"></div>
-      </section>
+    This is a placeholder for base href that will be replaced by the value of
+    the `--base-href` argument provided to `flutter build`.
+  -->
+  <base href="/">
 
-      <section id="membersView" class="view hidden">
-        <div id="memberList" class="list"></div>
-      </section>
+  <meta charset="UTF-8">
+  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
+  <meta name="description" content="A new Flutter project.">
 
-      <section id="auditView" class="view hidden">
-        <div id="auditList" class="auditList"></div>
-      </section>
-    </main>
+  <!-- iOS meta tags & icons -->
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="figurelist">
+  <link rel="apple-touch-icon" href="icons/Icon-192.png">
 
-    <aside id="detailPanel" class="detailPanel hidden" aria-label="詳細">
-      <div class="detailHeader">
-        <h2 id="detailTitle">詳細</h2>
-        <button id="closeDetail" class="iconButton" title="閉じる">×</button>
-      </div>
-      <div id="detailContent"></div>
-    </aside>
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" href="favicon.png"/>
 
-    <script src="/app.js"></script>
-  </body>
+  <title>figurelist</title>
+  <link rel="manifest" href="manifest.json">
+</head>
+<body>
+  <!--
+    You can customize the "flutter_bootstrap.js" script.
+    This is useful to provide a custom configuration to the Flutter loader
+    or to give the user feedback during the initialization process.
+
+    For more details:
+    * https://docs.flutter.dev/platform-integration/web/initialization
+  -->
+  <script src="flutter_bootstrap.js" async></script>
+</body>
 </html>

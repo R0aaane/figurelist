@@ -1106,7 +1106,11 @@ function serveStatic(res, pathname) {
     '.gif': 'image/gif',
     '.ico': 'image/x-icon'
   };
-  res.writeHead(200, { 'content-type': types[ext] || 'application/octet-stream' });
+  const headers = {
+    'content-type': types[ext] || 'application/octet-stream',
+    'cache-control': 'no-cache'
+  };
+  res.writeHead(200, headers);
   fs.createReadStream(filePath).pipe(res);
 }
 
