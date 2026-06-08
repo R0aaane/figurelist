@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../data/app_database.dart';
@@ -7,7 +9,6 @@ import 'figure_add_page.dart';
 import 'prize_detail_page.dart';
 import 'prize_notification_service.dart';
 import 'prize_repository.dart';
-import 'prize_status_chip.dart';
 import 'prize_store_page.dart';
 
 class PrizeListPage extends StatefulWidget {
@@ -32,6 +33,7 @@ class _PrizeListPageState extends State<PrizeListPage> {
   String? _statusFilter;
   int? _storeFilterId;
   _PrizeListDensity _density = _PrizeListDensity.large;
+  bool _gridView = true;
 
   @override
   void initState() {
@@ -68,167 +70,68 @@ class _PrizeListPageState extends State<PrizeListPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('\u30d7\u30e9\u30a4\u30ba\u53ce\u96c6\u7ba1\u7406'),
-        actions: [
-          IconButton(
-            tooltip: 'フィギュア追加',
-            onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute<void>(
-                  builder: (_) => FigureAddPage(
-                    repository: widget.repository,
-                    serverSyncService: widget.serverSyncService,
-                  ),
-                ),
-              );
-            },
-            icon: const Icon(Icons.add),
-          ),
-          IconButton(
-            tooltip: 'サーバー同期',
-            onPressed: () {
-              final service = widget.serverSyncService;
-              if (service == null) {
-                return;
-              }
-              Navigator.of(context).push(
-                MaterialPageRoute<void>(
-                  builder: (_) => ServerAccountPage(service: service),
-                ),
-              );
-            },
-            icon: const Icon(Icons.cloud_sync),
-          ),
-          IconButton(
-            tooltip: _density == _PrizeListDensity.compact
-                ? '\u30ea\u30b9\u30c8\u3092\u5927\u304d\u304f\u8868\u793a'
-                : '\u30ea\u30b9\u30c8\u3092\u901a\u5e38\u8868\u793a',
-            onPressed: () {
-              setState(() {
-                _density = _density == _PrizeListDensity.compact
-                    ? _PrizeListDensity.large
-                    : _PrizeListDensity.compact;
-              });
-            },
-            icon: Icon(
-              _density == _PrizeListDensity.compact
-                  ? Icons.view_agenda
-                  : Icons.view_list,
-            ),
-          ),
-          IconButton(
-            tooltip: '\u5e97\u8217\u767b\u9332',
-            onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute<void>(
-                  builder: (_) => PrizeStorePage(
-                    repository: widget.repository,
-                    notificationService: widget.notificationService,
-                  ),
-                ),
-              );
-            },
-            icon: const Icon(Icons.storefront),
-          ),
-          IconButton(
-            tooltip: '\u30b5\u30f3\u30d7\u30eb\u767b\u9332',
-            onPressed: () async {
-              await widget.repository.upsertFromSource();
-              await widget.repository.syncStoreAppearances();
-              await widget.notificationService.rescheduleArrivalNotifications(
-                widget.repository,
-              );
-            },
-            icon: const Icon(Icons.sync),
-          ),
-        ],
-      ),
-      body: Column(
+      body: Row(
         children: [
-          _FilterBar(
-            repository: widget.repository,
-            selectedStatus: _statusFilter,
-            selectedStoreId: _storeFilterId,
-            onStatusChanged: (value) => setState(() => _statusFilter = value),
-            onStoreChanged: (value) => setState(() => _storeFilterId = value),
-            characterController: _characterController,
-            seriesController: _seriesController,
+          _RailNavigation(
+            onAdd: _openAddPage,
+            onSync: _syncSamples,
+            onStores: _openStorePage,
+            onAccount: _openAccountPage,
           ),
+          const VerticalDivider(width: 1),
           Expanded(
-            child: StreamBuilder<List<PrizeItem>>(
-              stream: widget.repository.listPrizes(
-                status: _statusFilter,
-                characterQuery: _characterController.text,
-                seriesQuery: _seriesController.text,
-                registeredStoreId: _storeFilterId,
-              ),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting &&
-                    !snapshot.hasData) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-                final prizes = snapshot.data ?? const [];
-                if (prizes.isEmpty) {
-                  return const Center(
-                    child: Text(
-                      '\u8a72\u5f53\u3059\u308b\u30d7\u30e9\u30a4\u30ba\u306f\u3042\u308a\u307e\u305b\u3093',
-                    ),
-                  );
-                }
-                return StreamBuilder<List<PrizeStoreAppearanceEntry>>(
-                  stream: _storeFilterId == null
-                      ? Stream.value(const [])
-                      : widget.repository.watchAppearancesForStore(
-                          _storeFilterId!,
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final showSidebar = constraints.maxWidth >= 860;
+                return Row(
+                  children: [
+                    if (showSidebar)
+                      SizedBox(
+                        width: 304,
+                        child: _FolderSidebar(
+                          repository: widget.repository,
+                          selectedStatus: _statusFilter,
+                          selectedStoreId: _storeFilterId,
+                          onStatusChanged: (value) =>
+                              setState(() => _statusFilter = value),
+                          onStoreChanged: (value) =>
+                              setState(() => _storeFilterId = value),
                         ),
-                  builder: (context, appearanceSnapshot) {
-                    final appearancesByPrizeId = {
-                      for (final entry in appearanceSnapshot.data ?? const [])
-                        entry.appearance.prizeId: entry,
-                    };
-                    return ListView.separated(
-                      padding: const EdgeInsets.all(12),
-                      itemBuilder: (context, index) {
-                        final prize = prizes[index];
-                        return _PrizeTile(
-                          prize: prize,
-                          appearance: appearancesByPrizeId[prize.id],
-                          density: _density,
-                          onTap: () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute<void>(
-                                builder: (_) => PrizeDetailPage(
-                                  repository: widget.repository,
-                                  notificationService:
-                                      widget.notificationService,
-                                  serverSyncService: widget.serverSyncService,
-                                  prizeId: prize.id,
-                                ),
-                              ),
-                            );
-                          },
-                          onStatusSelected: (status) async {
-                            await widget.repository.updateStatus(
-                              prize.id,
-                              status,
-                            );
-                            await widget.serverSyncService?.updateStatus(
-                              prize.id,
-                              status,
-                            );
-                            await widget.notificationService
-                                .rescheduleArrivalNotifications(
-                                  widget.repository,
-                                );
-                          },
-                          onDeleteSelected: () => _confirmDelete(prize),
-                        );
-                      },
-                      separatorBuilder: (_, _) => const SizedBox(height: 8),
-                      itemCount: prizes.length,
-                    );
-                  },
+                      ),
+                    if (showSidebar) const VerticalDivider(width: 1),
+                    Expanded(
+                      child: _MainProjectsPane(
+                        repository: widget.repository,
+                        selectedStatus: _statusFilter,
+                        selectedStoreId: _storeFilterId,
+                        characterController: _characterController,
+                        seriesController: _seriesController,
+                        density: _density,
+                        gridView: _gridView,
+                        showInlineFilters: !showSidebar,
+                        onStatusChanged: (value) =>
+                            setState(() => _statusFilter = value),
+                        onStoreChanged: (value) =>
+                            setState(() => _storeFilterId = value),
+                        onAdd: _openAddPage,
+                        onSync: _syncSamples,
+                        onStores: _openStorePage,
+                        onAccount: _openAccountPage,
+                        onToggleGridView: () =>
+                            setState(() => _gridView = !_gridView),
+                        onToggleDensity: () {
+                          setState(() {
+                            _density = _density == _PrizeListDensity.compact
+                                ? _PrizeListDensity.large
+                                : _PrizeListDensity.compact;
+                          });
+                        },
+                        onOpenPrize: _openPrize,
+                        onStatusSelected: _updatePrizeStatus,
+                        onDeleteSelected: _confirmDelete,
+                      ),
+                    ),
+                  ],
                 );
               },
             ),
@@ -238,24 +141,87 @@ class _PrizeListPageState extends State<PrizeListPage> {
     );
   }
 
+  void _openAddPage() {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => FigureAddPage(
+          repository: widget.repository,
+          serverSyncService: widget.serverSyncService,
+        ),
+      ),
+    );
+  }
+
+  void _openAccountPage() {
+    final service = widget.serverSyncService;
+    if (service == null) {
+      return;
+    }
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => ServerAccountPage(service: service),
+      ),
+    );
+  }
+
+  void _openStorePage() {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => PrizeStorePage(
+          repository: widget.repository,
+          notificationService: widget.notificationService,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _syncSamples() async {
+    await widget.repository.upsertFromSource();
+    await widget.repository.syncStoreAppearances();
+    await widget.notificationService.rescheduleArrivalNotifications(
+      widget.repository,
+    );
+  }
+
+  void _openPrize(PrizeItem prize) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => PrizeDetailPage(
+          repository: widget.repository,
+          notificationService: widget.notificationService,
+          serverSyncService: widget.serverSyncService,
+          prizeId: prize.id,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _updatePrizeStatus(PrizeItem prize, String status) async {
+    await widget.repository.updateStatus(prize.id, status);
+    await widget.serverSyncService?.updateStatus(prize.id, status);
+    await widget.notificationService.rescheduleArrivalNotifications(
+      widget.repository,
+    );
+  }
+
   Future<void> _confirmDelete(PrizeItem prize) async {
     final shouldDelete = await showDialog<bool>(
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Text('\u30d7\u30e9\u30a4\u30ba\u3092\u524a\u9664'),
+          title: const Text('プライズを削除'),
           content: Text(
             '${prize.title}\n\n'
-            '\u30ed\u30b0\u30a4\u30f3\u4e2d\u306e\u5834\u5408\u306f\u3053\u306e\u30a2\u30ab\u30a6\u30f3\u30c8\u306e\u4e00\u89a7\u304b\u3089\u306e\u307f\u524a\u9664\u3057\u307e\u3059\u3002',
+            'ログイン中の場合はこのアカウントの一覧からのみ削除します。',
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('\u30ad\u30e3\u30f3\u30bb\u30eb'),
+              child: const Text('キャンセル'),
             ),
             FilledButton(
               onPressed: () => Navigator.of(context).pop(true),
-              child: const Text('\u524a\u9664'),
+              child: const Text('削除'),
             ),
           ],
         );
@@ -273,27 +239,140 @@ class _PrizeListPageState extends State<PrizeListPage> {
     if (!mounted) {
       return;
     }
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text(
-          '\u30d7\u30e9\u30a4\u30ba\u3092\u524a\u9664\u3057\u307e\u3057\u305f',
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('プライズを削除しました')));
+  }
+}
+
+enum _PrizeListDensity { compact, large }
+
+class _RailNavigation extends StatelessWidget {
+  const _RailNavigation({
+    required this.onAdd,
+    required this.onSync,
+    required this.onStores,
+    required this.onAccount,
+  });
+
+  final VoidCallback onAdd;
+  final VoidCallback onSync;
+  final VoidCallback onStores;
+  final VoidCallback onAccount;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 60,
+      color: Colors.white,
+      child: SafeArea(
+        child: Column(
+          children: [
+            const SizedBox(height: 12),
+            const _AppMark(),
+            const SizedBox(height: 28),
+            _RailButton(
+              icon: Icons.home_outlined,
+              tooltip: 'ホーム',
+              selected: true,
+            ),
+            _RailButton(icon: Icons.search, tooltip: '検索', onPressed: () {}),
+            _RailButton(icon: Icons.inventory_2_outlined, tooltip: '一覧'),
+            _RailButton(
+              icon: Icons.storefront_outlined,
+              tooltip: '店舗',
+              onPressed: onStores,
+            ),
+            _RailButton(icon: Icons.add, tooltip: '追加', onPressed: onAdd),
+            _RailButton(
+              icon: Icons.cloud_sync_outlined,
+              tooltip: 'アカウント',
+              onPressed: onAccount,
+            ),
+            _RailButton(icon: Icons.sync, tooltip: '同期', onPressed: onSync),
+            const Spacer(),
+            _RailButton(icon: Icons.notifications_none, tooltip: '通知'),
+            _RailButton(icon: Icons.help_outline, tooltip: 'ヘルプ'),
+            const SizedBox(height: 12),
+            const CircleAvatar(
+              radius: 18,
+              backgroundColor: Color(0xFFF3F3F4),
+              child: Text('F', style: TextStyle(color: Color(0xFF151518))),
+            ),
+            const SizedBox(height: 12),
+          ],
         ),
       ),
     );
   }
 }
 
-enum _PrizeListDensity { compact, large }
+class _RailButton extends StatelessWidget {
+  const _RailButton({
+    required this.icon,
+    required this.tooltip,
+    this.selected = false,
+    this.onPressed,
+  });
 
-class _FilterBar extends StatelessWidget {
-  const _FilterBar({
+  final IconData icon;
+  final String tooltip;
+  final bool selected;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Tooltip(
+        message: tooltip,
+        child: IconButton(
+          onPressed: onPressed,
+          style: IconButton.styleFrom(
+            fixedSize: const Size(40, 40),
+            backgroundColor: selected
+                ? const Color(0xFFECECEF)
+                : Colors.transparent,
+            foregroundColor: const Color(0xFF151518),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+          ),
+          icon: Icon(icon, size: 21),
+        ),
+      ),
+    );
+  }
+}
+
+class _AppMark extends StatelessWidget {
+  const _AppMark();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 34,
+      height: 34,
+      decoration: BoxDecoration(
+        color: const Color(0xFF151518),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: const Icon(
+        Icons.view_in_ar_outlined,
+        color: Colors.white,
+        size: 21,
+      ),
+    );
+  }
+}
+
+class _FolderSidebar extends StatelessWidget {
+  const _FolderSidebar({
     required this.repository,
     required this.selectedStatus,
     required this.selectedStoreId,
     required this.onStatusChanged,
     required this.onStoreChanged,
-    required this.characterController,
-    required this.seriesController,
   });
 
   final PrizeRepository repository;
@@ -301,64 +380,192 @@ class _FilterBar extends StatelessWidget {
   final int? selectedStoreId;
   final ValueChanged<String?> onStatusChanged;
   final ValueChanged<int?> onStoreChanged;
-  final TextEditingController characterController;
-  final TextEditingController seriesController;
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Theme.of(context).colorScheme.surface,
-      elevation: 1,
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxHeight: 260),
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
-          child: Column(
-            children: [
-              _StatusFilterRow(
-                selectedStatus: selectedStatus,
-                onStatusChanged: onStatusChanged,
+    return Container(
+      color: Colors.white,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const _SidebarHeader(),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 10),
+            child: OutlinedButton.icon(
+              onPressed: () {},
+              icon: const Icon(Icons.add, size: 20),
+              label: const Text('New Folder'),
+              style: OutlinedButton.styleFrom(
+                alignment: Alignment.centerLeft,
+                foregroundColor: const Color(0xFF151518),
+                side: const BorderSide(color: Color(0xFFE0E0E3)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(7),
+                ),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 14,
+                ),
               ),
-              const SizedBox(height: 8),
-              _StoreFilterRow(
-                repository: repository,
-                selectedStoreId: selectedStoreId,
-                onStoreChanged: onStoreChanged,
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+            child: Row(
+              children: [
+                const Expanded(
+                  child: _SidebarSearchField(hintText: 'Search folders'),
+                ),
+                const SizedBox(width: 8),
+                _SmallSquareButton(
+                  icon: Icons.filter_alt_outlined,
+                  onPressed: () {},
+                ),
+              ],
+            ),
+          ),
+          _FolderItem(
+            icon: Icons.all_inbox_outlined,
+            label: 'My Figures',
+            selected: selectedStatus == null && selectedStoreId == null,
+            onTap: () {
+              onStatusChanged(null);
+              onStoreChanged(null);
+            },
+          ),
+          _FolderItem(
+            icon: Icons.bookmark_border,
+            label: '獲得予定',
+            selected: selectedStatus == PrizeStatus.reserved,
+            onTap: () => onStatusChanged(PrizeStatus.reserved),
+          ),
+          _FolderItem(
+            icon: Icons.check_circle_outline,
+            label: '獲得済み',
+            selected: selectedStatus == PrizeStatus.owned,
+            onTap: () => onStatusChanged(PrizeStatus.owned),
+          ),
+          _FolderItem(
+            icon: Icons.radio_button_unchecked,
+            label: '未獲得',
+            selected: selectedStatus == PrizeStatus.unowned,
+            onTap: () => onStatusChanged(PrizeStatus.unowned),
+          ),
+          _FolderItem(
+            icon: Icons.block_outlined,
+            label: '見送り',
+            selected: selectedStatus == PrizeStatus.skipped,
+            onTap: () => onStatusChanged(PrizeStatus.skipped),
+          ),
+          const Padding(
+            padding: EdgeInsets.fromLTRB(16, 20, 16, 8),
+            child: Text(
+              'Stores',
+              style: TextStyle(
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF737376),
               ),
-              const SizedBox(height: 8),
-              LayoutBuilder(
-                builder: (context, constraints) {
-                  final isWide = constraints.maxWidth >= 720;
-                  final characterFilter = _SuggestionTextFilter(
-                    controller: characterController,
-                    labelText: '\u30ad\u30e3\u30e9\u540d\u691c\u7d22',
-                    icon: Icons.person_search,
-                    suggestionsStream: repository.watchCharacterNames(),
+            ),
+          ),
+          Expanded(
+            child: StreamBuilder<List<PrizeStore>>(
+              stream: repository.listStores(registeredOnly: true),
+              builder: (context, snapshot) {
+                final stores = snapshot.data ?? const [];
+                if (stores.isEmpty) {
+                  return const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 16),
+                    child: Text('登録済み店舗なし'),
                   );
-                  final seriesFilter = _SuggestionTextFilter(
-                    controller: seriesController,
-                    labelText: '\u30b7\u30ea\u30fc\u30ba\u691c\u7d22',
-                    icon: Icons.search,
-                    suggestionsStream: repository.watchSeriesNames(),
-                  );
-                  if (isWide) {
-                    return Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(child: characterFilter),
-                        const SizedBox(width: 8),
-                        Expanded(child: seriesFilter),
-                      ],
+                }
+                return ListView.builder(
+                  padding: EdgeInsets.zero,
+                  itemCount: stores.length,
+                  itemBuilder: (context, index) {
+                    final store = stores[index];
+                    return _FolderItem(
+                      icon: Icons.store_mall_directory_outlined,
+                      label: store.name,
+                      selected: selectedStoreId == store.id,
+                      onTap: () => onStoreChanged(store.id),
                     );
-                  }
-                  return Column(
-                    children: [
-                      characterFilter,
-                      const SizedBox(height: 8),
-                      seriesFilter,
-                    ],
-                  );
-                },
+                  },
+                );
+              },
+            ),
+          ),
+          const Divider(),
+          _FolderItem(
+            icon: Icons.archive_outlined,
+            label: 'Archives',
+            onTap: () {},
+          ),
+          const SizedBox(height: 8),
+        ],
+      ),
+    );
+  }
+}
+
+class _SidebarHeader extends StatelessWidget {
+  const _SidebarHeader();
+
+  @override
+  Widget build(BuildContext context) {
+    return const SizedBox(
+      height: 60,
+      child: Padding(
+        padding: EdgeInsets.symmetric(horizontal: 26),
+        child: Align(
+          alignment: Alignment.centerLeft,
+          child: Text(
+            'Folders',
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _FolderItem extends StatelessWidget {
+  const _FolderItem({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    this.selected = false,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+  final bool selected;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(7),
+        onTap: onTap,
+        child: Container(
+          height: 38,
+          decoration: BoxDecoration(
+            color: selected ? const Color(0xFFE9E9EB) : Colors.transparent,
+            borderRadius: BorderRadius.circular(7),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 11),
+          child: Row(
+            children: [
+              Icon(icon, size: 19, color: const Color(0xFF151518)),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
               ),
             ],
           ),
@@ -368,90 +575,497 @@ class _FilterBar extends StatelessWidget {
   }
 }
 
-class _StatusFilterRow extends StatelessWidget {
-  const _StatusFilterRow({
+class _MainProjectsPane extends StatelessWidget {
+  const _MainProjectsPane({
+    required this.repository,
     required this.selectedStatus,
+    required this.selectedStoreId,
+    required this.characterController,
+    required this.seriesController,
+    required this.density,
+    required this.gridView,
+    required this.showInlineFilters,
     required this.onStatusChanged,
+    required this.onStoreChanged,
+    required this.onAdd,
+    required this.onSync,
+    required this.onStores,
+    required this.onAccount,
+    required this.onToggleGridView,
+    required this.onToggleDensity,
+    required this.onOpenPrize,
+    required this.onStatusSelected,
+    required this.onDeleteSelected,
   });
 
+  final PrizeRepository repository;
   final String? selectedStatus;
+  final int? selectedStoreId;
+  final TextEditingController characterController;
+  final TextEditingController seriesController;
+  final _PrizeListDensity density;
+  final bool gridView;
+  final bool showInlineFilters;
   final ValueChanged<String?> onStatusChanged;
+  final ValueChanged<int?> onStoreChanged;
+  final VoidCallback onAdd;
+  final Future<void> Function() onSync;
+  final VoidCallback onStores;
+  final VoidCallback onAccount;
+  final VoidCallback onToggleGridView;
+  final VoidCallback onToggleDensity;
+  final ValueChanged<PrizeItem> onOpenPrize;
+  final void Function(PrizeItem prize, String status) onStatusSelected;
+  final ValueChanged<PrizeItem> onDeleteSelected;
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: SegmentedButton<String?>(
-        segments: const [
-          ButtonSegment(value: null, label: Text('\u3059\u3079\u3066')),
-          ButtonSegment(
-            value: PrizeStatus.unowned,
-            label: Text('\u672a\u7372\u5f97'),
+    return Column(
+      children: [
+        _TopBar(onAdd: onAdd, onStores: onStores, onAccount: onAccount),
+        Expanded(
+          child: StreamBuilder<List<PrizeItem>>(
+            stream: repository.listPrizes(
+              status: selectedStatus,
+              characterQuery: characterController.text,
+              seriesQuery: seriesController.text,
+              registeredStoreId: selectedStoreId,
+            ),
+            builder: (context, snapshot) {
+              final prizes = snapshot.data ?? const [];
+              return StreamBuilder<List<PrizeStoreAppearanceEntry>>(
+                stream: selectedStoreId == null
+                    ? Stream.value(const [])
+                    : repository.watchAppearancesForStore(selectedStoreId!),
+                builder: (context, appearanceSnapshot) {
+                  final appearancesByPrizeId = <int, PrizeStoreAppearanceEntry>{
+                    for (final entry in appearanceSnapshot.data ?? const [])
+                      entry.appearance.prizeId: entry,
+                  };
+                  return Column(
+                    children: [
+                      _LimitBanner(count: prizes.length),
+                      _ProjectToolbar(
+                        repository: repository,
+                        characterController: characterController,
+                        seriesController: seriesController,
+                        selectedStatus: selectedStatus,
+                        selectedStoreId: selectedStoreId,
+                        showInlineFilters: showInlineFilters,
+                        gridView: gridView,
+                        onStatusChanged: onStatusChanged,
+                        onStoreChanged: onStoreChanged,
+                        onToggleGridView: onToggleGridView,
+                        onToggleDensity: onToggleDensity,
+                        onSync: onSync,
+                      ),
+                      Expanded(
+                        child: _PrizeCollectionView(
+                          prizes: prizes,
+                          isLoading:
+                              snapshot.connectionState ==
+                                  ConnectionState.waiting &&
+                              !snapshot.hasData,
+                          appearancesByPrizeId: appearancesByPrizeId,
+                          gridView: gridView,
+                          density: density,
+                          onOpenPrize: onOpenPrize,
+                          onStatusSelected: onStatusSelected,
+                          onDeleteSelected: onDeleteSelected,
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              );
+            },
           ),
-          ButtonSegment(
-            value: PrizeStatus.owned,
-            label: Text('\u7372\u5f97\u6e08\u307f'),
+        ),
+      ],
+    );
+  }
+}
+
+class _TopBar extends StatelessWidget {
+  const _TopBar({
+    required this.onAdd,
+    required this.onStores,
+    required this.onAccount,
+  });
+
+  final VoidCallback onAdd;
+  final VoidCallback onStores;
+  final VoidCallback onAccount;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 60,
+      color: Colors.white,
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Row(
+        children: [
+          const Text(
+            'My Figures',
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
           ),
-          ButtonSegment(
-            value: PrizeStatus.reserved,
-            label: Text('\u7372\u5f97\u4e88\u5b9a'),
+          const Spacer(),
+          IconButton(
+            tooltip: '店舗登録',
+            onPressed: onStores,
+            icon: const Icon(Icons.storefront_outlined),
           ),
-          ButtonSegment(
-            value: PrizeStatus.skipped,
-            label: Text('\u898b\u9001\u308a'),
+          IconButton(
+            tooltip: 'アカウント',
+            onPressed: onAccount,
+            icon: const Icon(Icons.cloud_sync_outlined),
+          ),
+          const SizedBox(width: 8),
+          FilledButton.icon(
+            onPressed: onAdd,
+            icon: const Icon(Icons.add, size: 18),
+            label: const Text('New Figure'),
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFF151518),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(7),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+            ),
           ),
         ],
-        selected: {selectedStatus},
-        onSelectionChanged: (values) => onStatusChanged(values.first),
       ),
     );
   }
 }
 
-class _StoreFilterRow extends StatelessWidget {
-  const _StoreFilterRow({
+class _LimitBanner extends StatelessWidget {
+  const _LimitBanner({required this.count});
+
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 14, 20, 10),
+      child: Container(
+        height: 44,
+        decoration: BoxDecoration(
+          color: const Color(0xFFFFF8EA),
+          border: Border.all(color: const Color(0xFFF0DDC0)),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        child: Row(
+          children: [
+            const Icon(Icons.info_outline, size: 18, color: Color(0xFF8B5A13)),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Figures tracked ($count). Use filters to organize your collection.',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: Color(0xFF80510F),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            Container(
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFD23F),
+                borderRadius: BorderRadius.circular(7),
+                boxShadow: const [
+                  BoxShadow(
+                    color: Color(0x22000000),
+                    blurRadius: 8,
+                    offset: Offset(0, 2),
+                  ),
+                ],
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.auto_awesome, size: 16, color: Color(0xFF151518)),
+                  SizedBox(width: 6),
+                  Text(
+                    'Organize',
+                    style: TextStyle(
+                      color: Color(0xFF151518),
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ProjectToolbar extends StatelessWidget {
+  const _ProjectToolbar({
     required this.repository,
+    required this.characterController,
+    required this.seriesController,
+    required this.selectedStatus,
     required this.selectedStoreId,
+    required this.showInlineFilters,
+    required this.gridView,
+    required this.onStatusChanged,
+    required this.onStoreChanged,
+    required this.onToggleGridView,
+    required this.onToggleDensity,
+    required this.onSync,
+  });
+
+  final PrizeRepository repository;
+  final TextEditingController characterController;
+  final TextEditingController seriesController;
+  final String? selectedStatus;
+  final int? selectedStoreId;
+  final bool showInlineFilters;
+  final bool gridView;
+  final ValueChanged<String?> onStatusChanged;
+  final ValueChanged<int?> onStoreChanged;
+  final VoidCallback onToggleGridView;
+  final VoidCallback onToggleDensity;
+  final Future<void> Function() onSync;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 14),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Expanded(
+                flex: 2,
+                child: _SuggestionTextFilter(
+                  controller: characterController,
+                  hintText: 'Search figures',
+                  icon: Icons.search,
+                  suggestionsStream: repository.watchCharacterNames(),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _SuggestionTextFilter(
+                  controller: seriesController,
+                  hintText: 'Search series',
+                  icon: Icons.collections_bookmark_outlined,
+                  suggestionsStream: repository.watchSeriesNames(),
+                ),
+              ),
+              const SizedBox(width: 10),
+              _SmallSquareButton(
+                icon: gridView ? Icons.view_list : Icons.grid_view_outlined,
+                tooltip: gridView ? 'リスト表示' : 'グリッド表示',
+                onPressed: onToggleGridView,
+              ),
+              const SizedBox(width: 8),
+              _SmallSquareButton(
+                icon: Icons.density_medium_outlined,
+                tooltip: '表示密度',
+                onPressed: onToggleDensity,
+              ),
+              const SizedBox(width: 8),
+              OutlinedButton.icon(
+                onPressed: onSync,
+                icon: const Icon(Icons.sync, size: 18),
+                label: const Text('Sync'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: const Color(0xFF151518),
+                  side: const BorderSide(color: Color(0xFFE0E0E3)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(7),
+                  ),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 14,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          if (showInlineFilters) ...[
+            const SizedBox(height: 10),
+            _InlineFilters(
+              repository: repository,
+              selectedStatus: selectedStatus,
+              selectedStoreId: selectedStoreId,
+              onStatusChanged: onStatusChanged,
+              onStoreChanged: onStoreChanged,
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _InlineFilters extends StatelessWidget {
+  const _InlineFilters({
+    required this.repository,
+    required this.selectedStatus,
+    required this.selectedStoreId,
+    required this.onStatusChanged,
     required this.onStoreChanged,
   });
 
   final PrizeRepository repository;
+  final String? selectedStatus;
   final int? selectedStoreId;
+  final ValueChanged<String?> onStatusChanged;
   final ValueChanged<int?> onStoreChanged;
 
   @override
   Widget build(BuildContext context) {
-    return StreamBuilder<List<PrizeStore>>(
-      stream: repository.listStores(registeredOnly: true),
-      builder: (context, snapshot) {
-        final stores = snapshot.data ?? const [];
-        if (stores.isEmpty) {
-          return const Align(
-            alignment: Alignment.centerLeft,
-            child: Text('\u767b\u9332\u6e08\u307f\u5e97\u8217\u306a\u3057'),
-          );
-        }
-        return Align(
-          alignment: Alignment.centerLeft,
-          child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Wrap(
-              spacing: 8,
-              children: [
-                ChoiceChip(
-                  label: const Text('\u5e97\u8217\u3059\u3079\u3066'),
-                  selected: selectedStoreId == null,
-                  onSelected: (_) => onStoreChanged(null),
-                ),
-                for (final store in stores)
-                  ChoiceChip(
-                    label: Text(store.name),
-                    selected: selectedStoreId == store.id,
-                    onSelected: (_) => onStoreChanged(store.id),
-                  ),
-              ],
-            ),
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: [
+          _FilterChipButton(
+            label: 'すべて',
+            selected: selectedStatus == null && selectedStoreId == null,
+            onTap: () {
+              onStatusChanged(null);
+              onStoreChanged(null);
+            },
           ),
+          _FilterChipButton(
+            label: '未獲得',
+            selected: selectedStatus == PrizeStatus.unowned,
+            onTap: () => onStatusChanged(PrizeStatus.unowned),
+          ),
+          _FilterChipButton(
+            label: '獲得済み',
+            selected: selectedStatus == PrizeStatus.owned,
+            onTap: () => onStatusChanged(PrizeStatus.owned),
+          ),
+          _FilterChipButton(
+            label: '獲得予定',
+            selected: selectedStatus == PrizeStatus.reserved,
+            onTap: () => onStatusChanged(PrizeStatus.reserved),
+          ),
+          _FilterChipButton(
+            label: '見送り',
+            selected: selectedStatus == PrizeStatus.skipped,
+            onTap: () => onStatusChanged(PrizeStatus.skipped),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FilterChipButton extends StatelessWidget {
+  const _FilterChipButton({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: ChoiceChip(
+        label: Text(label),
+        selected: selected,
+        onSelected: (_) => onTap(),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(7)),
+      ),
+    );
+  }
+}
+
+class _PrizeCollectionView extends StatelessWidget {
+  const _PrizeCollectionView({
+    required this.prizes,
+    required this.isLoading,
+    required this.appearancesByPrizeId,
+    required this.gridView,
+    required this.density,
+    required this.onOpenPrize,
+    required this.onStatusSelected,
+    required this.onDeleteSelected,
+  });
+
+  final List<PrizeItem> prizes;
+  final bool isLoading;
+  final Map<int, PrizeStoreAppearanceEntry> appearancesByPrizeId;
+  final bool gridView;
+  final _PrizeListDensity density;
+  final ValueChanged<PrizeItem> onOpenPrize;
+  final void Function(PrizeItem prize, String status) onStatusSelected;
+  final ValueChanged<PrizeItem> onDeleteSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    if (isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (prizes.isEmpty) {
+      return const Center(child: Text('該当するプライズはありません'));
+    }
+    if (!gridView) {
+      return ListView.separated(
+        padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+        itemBuilder: (context, index) {
+          final prize = prizes[index];
+          return _PrizeTile(
+            prize: prize,
+            appearance: appearancesByPrizeId[prize.id],
+            density: density,
+            asGridCard: false,
+            onTap: () => onOpenPrize(prize),
+            onStatusSelected: (status) => onStatusSelected(prize, status),
+            onDeleteSelected: () => onDeleteSelected(prize),
+          );
+        },
+        separatorBuilder: (_, _) => const SizedBox(height: 10),
+        itemCount: prizes.length,
+      );
+    }
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final width = constraints.maxWidth;
+        final columns = width >= 1320
+            ? 3
+            : width >= 760
+            ? 2
+            : 1;
+        return GridView.builder(
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: columns,
+            crossAxisSpacing: 28,
+            mainAxisSpacing: 18,
+            childAspectRatio: density == _PrizeListDensity.large ? 2.45 : 3.8,
+          ),
+          itemCount: prizes.length,
+          itemBuilder: (context, index) {
+            final prize = prizes[index];
+            return _PrizeTile(
+              prize: prize,
+              appearance: appearancesByPrizeId[prize.id],
+              density: density,
+              asGridCard: true,
+              onTap: () => onOpenPrize(prize),
+              onStatusSelected: (status) => onStatusSelected(prize, status),
+              onDeleteSelected: () => onDeleteSelected(prize),
+            );
+          },
         );
       },
     );
@@ -461,13 +1075,13 @@ class _StoreFilterRow extends StatelessWidget {
 class _SuggestionTextFilter extends StatefulWidget {
   const _SuggestionTextFilter({
     required this.controller,
-    required this.labelText,
+    required this.hintText,
     required this.icon,
     required this.suggestionsStream,
   });
 
   final TextEditingController controller;
-  final String labelText;
+  final String hintText;
   final IconData icon;
   final Stream<List<String>> suggestionsStream;
 
@@ -517,17 +1131,20 @@ class _SuggestionTextFilterState extends State<_SuggestionTextFilter> {
                   controller: textEditingController,
                   focusNode: focusNode,
                   decoration: InputDecoration(
-                    labelText: widget.labelText,
-                    prefixIcon: Icon(widget.icon),
+                    hintText: widget.hintText,
+                    prefixIcon: Icon(widget.icon, size: 21),
                     suffixIcon: textEditingController.text.isEmpty
                         ? null
                         : IconButton(
-                            tooltip: '\u30af\u30ea\u30a2',
+                            tooltip: 'クリア',
                             onPressed: textEditingController.clear,
-                            icon: const Icon(Icons.clear),
+                            icon: const Icon(Icons.close, size: 18),
                           ),
-                    border: const OutlineInputBorder(),
                     isDense: true,
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 14,
+                    ),
                   ),
                 );
               },
@@ -536,7 +1153,7 @@ class _SuggestionTextFilterState extends State<_SuggestionTextFilter> {
             return Align(
               alignment: Alignment.topLeft,
               child: Material(
-                color: Theme.of(context).colorScheme.surfaceContainer,
+                color: Colors.white,
                 elevation: 8,
                 borderRadius: BorderRadius.circular(8),
                 child: ConstrainedBox(
@@ -561,10 +1178,7 @@ class _SuggestionTextFilterState extends State<_SuggestionTextFilter> {
                         ),
                       );
                     },
-                    separatorBuilder: (_, _) => Divider(
-                      height: 1,
-                      color: Theme.of(context).colorScheme.outlineVariant,
-                    ),
+                    separatorBuilder: (_, _) => const Divider(height: 1),
                     itemCount: optionList.length,
                   ),
                 ),
@@ -577,11 +1191,63 @@ class _SuggestionTextFilterState extends State<_SuggestionTextFilter> {
   }
 }
 
+class _SidebarSearchField extends StatelessWidget {
+  const _SidebarSearchField({required this.hintText});
+
+  final String hintText;
+
+  @override
+  Widget build(BuildContext context) {
+    return TextField(
+      decoration: InputDecoration(
+        hintText: hintText,
+        prefixIcon: const Icon(Icons.search, size: 21),
+        isDense: true,
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 12,
+          vertical: 12,
+        ),
+      ),
+    );
+  }
+}
+
+class _SmallSquareButton extends StatelessWidget {
+  const _SmallSquareButton({
+    required this.icon,
+    required this.onPressed,
+    this.tooltip,
+  });
+
+  final IconData icon;
+  final VoidCallback onPressed;
+  final String? tooltip;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: tooltip ?? '',
+      child: IconButton(
+        onPressed: onPressed,
+        style: IconButton.styleFrom(
+          fixedSize: const Size(43, 43),
+          backgroundColor: Colors.white,
+          foregroundColor: const Color(0xFF151518),
+          side: const BorderSide(color: Color(0xFFE0E0E3)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(7)),
+        ),
+        icon: Icon(icon, size: 21),
+      ),
+    );
+  }
+}
+
 class _PrizeTile extends StatelessWidget {
   const _PrizeTile({
     required this.prize,
     required this.appearance,
     required this.density,
+    required this.asGridCard,
     required this.onTap,
     required this.onStatusSelected,
     required this.onDeleteSelected,
@@ -590,18 +1256,14 @@ class _PrizeTile extends StatelessWidget {
   final PrizeItem prize;
   final PrizeStoreAppearanceEntry? appearance;
   final _PrizeListDensity density;
+  final bool asGridCard;
   final VoidCallback onTap;
   final ValueChanged<String> onStatusSelected;
   final VoidCallback onDeleteSelected;
 
   @override
   Widget build(BuildContext context) {
-    final imageSize = density == _PrizeListDensity.large ? 128.0 : 56.0;
-    final titleMaxLines = density == _PrizeListDensity.large ? 4 : 2;
-    final subtitleStyle = density == _PrizeListDensity.large
-        ? Theme.of(context).textTheme.bodyMedium
-        : Theme.of(context).textTheme.bodySmall;
-
+    final imageSize = density == _PrizeListDensity.large ? 76.0 : 50.0;
     return GestureDetector(
       onSecondaryTapDown: (details) =>
           _showContextMenu(context, details.globalPosition),
@@ -610,67 +1272,79 @@ class _PrizeTile extends StatelessWidget {
       child: Card(
         margin: EdgeInsets.zero,
         child: InkWell(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(8),
           onTap: onTap,
           child: Padding(
             padding: EdgeInsets.all(
-              density == _PrizeListDensity.large ? 14 : 10,
+              density == _PrizeListDensity.large ? 18 : 12,
             ),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _PrizeImage(url: prize.imageUrl, size: imageSize),
-                const SizedBox(width: 12),
+                const SizedBox(width: 14),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
-                        prize.title,
-                        maxLines: titleMaxLines,
-                        overflow: TextOverflow.ellipsis,
-                        style: density == _PrizeListDensity.large
-                            ? Theme.of(context).textTheme.titleMedium
-                            : Theme.of(context).textTheme.bodyLarge,
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        '${prize.characterName} / ${prize.seriesName}\n'
-                        '${prize.maker} / ${prize.releaseText}',
-                        style: subtitleStyle,
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            prize.title,
+                            maxLines: asGridCard ? 2 : 3,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w800,
+                              color: Color(0xFF151518),
+                            ),
+                          ),
+                          const SizedBox(height: 5),
+                          Text(
+                            '${prize.characterName} / ${prize.seriesName}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(color: Color(0xFF78787D)),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            '${prize.maker} / ${prize.releaseText}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(color: Color(0xFF78787D)),
+                          ),
+                        ],
                       ),
                       if (density == _PrizeListDensity.large) ...[
-                        const SizedBox(height: 8),
+                        const SizedBox(height: 14),
                         Wrap(
                           spacing: 8,
                           runSpacing: 6,
+                          crossAxisAlignment: WrapCrossAlignment.center,
                           children: [
-                            PrizeStatusChip(status: prize.status),
+                            _PrizeStatusPill(status: prize.status),
                             if (appearance != null)
-                              _ArrivalChip(entry: appearance!),
+                              _ArrivalPill(entry: appearance!),
                           ],
                         ),
                       ],
                     ],
                   ),
                 ),
-                if (density == _PrizeListDensity.compact) ...[
-                  const SizedBox(width: 8),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      PrizeStatusChip(status: prize.status),
-                      if (appearance != null) ...[
-                        const SizedBox(height: 6),
-                        _ArrivalChip(entry: appearance!),
-                      ],
-                    ],
-                  ),
-                ],
-                IconButton(
-                  tooltip: '\u64cd\u4f5c',
-                  onPressed: () => _showContextMenuForButton(context),
-                  icon: const Icon(Icons.more_vert),
+                const SizedBox(width: 8),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    const _CloudBadge(),
+                    const SizedBox(height: 16),
+                    IconButton(
+                      tooltip: '操作',
+                      onPressed: () => _showContextMenuForButton(context),
+                      icon: const Icon(Icons.more_vert),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -700,38 +1374,29 @@ class _PrizeTile extends StatelessWidget {
       items: const [
         PopupMenuItem(
           value: _PrizeAction.markOwned,
-          child: ListTile(
-            leading: Icon(Icons.check),
-            title: Text('\u7372\u5f97\u6e08\u307f\u306b\u3059\u308b'),
-          ),
+          child: ListTile(leading: Icon(Icons.check), title: Text('獲得済みにする')),
         ),
         PopupMenuItem(
           value: _PrizeAction.markUnowned,
-          child: ListTile(
-            leading: Icon(Icons.undo),
-            title: Text('\u672a\u7372\u5f97\u306b\u623b\u3059'),
-          ),
+          child: ListTile(leading: Icon(Icons.undo), title: Text('未獲得に戻す')),
         ),
         PopupMenuItem(
           value: _PrizeAction.markReserved,
           child: ListTile(
             leading: Icon(Icons.event_available),
-            title: Text('\u7372\u5f97\u4e88\u5b9a\u306b\u3059\u308b'),
+            title: Text('獲得予定にする'),
           ),
         ),
         PopupMenuItem(
           value: _PrizeAction.markSkipped,
-          child: ListTile(
-            leading: Icon(Icons.block),
-            title: Text('\u898b\u9001\u308a\u306b\u3059\u308b'),
-          ),
+          child: ListTile(leading: Icon(Icons.block), title: Text('見送りにする')),
         ),
         PopupMenuDivider(),
         PopupMenuItem(
           value: _PrizeAction.delete,
           child: ListTile(
             leading: Icon(Icons.delete_outline),
-            title: Text('\u524a\u9664'),
+            title: Text('削除'),
           ),
         ),
       ],
@@ -754,20 +1419,86 @@ class _PrizeTile extends StatelessWidget {
   }
 }
 
-class _ArrivalChip extends StatelessWidget {
-  const _ArrivalChip({required this.entry});
+class _CloudBadge extends StatelessWidget {
+  const _CloudBadge();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 34,
+      height: 34,
+      decoration: BoxDecoration(
+        color: const Color(0xFFD9FFE9),
+        border: Border.all(color: const Color(0xFF98EABB)),
+        shape: BoxShape.circle,
+      ),
+      child: const Icon(
+        Icons.cloud_outlined,
+        color: Color(0xFF16A05D),
+        size: 19,
+      ),
+    );
+  }
+}
+
+class _PrizeStatusPill extends StatelessWidget {
+  const _PrizeStatusPill({required this.status});
+
+  final String status;
+
+  @override
+  Widget build(BuildContext context) {
+    final style = _statusStyle(status);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: style.background,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: style.border),
+      ),
+      child: Text(
+        style.label,
+        style: TextStyle(
+          color: style.foreground,
+          fontWeight: FontWeight.w700,
+          fontSize: 12,
+        ),
+      ),
+    );
+  }
+}
+
+class _ArrivalPill extends StatelessWidget {
+  const _ArrivalPill({required this.entry});
 
   final PrizeStoreAppearanceEntry entry;
 
   @override
   Widget build(BuildContext context) {
-    final text = entry.appearance.appearanceText;
-    return Chip(
-      avatar: const Icon(Icons.schedule, size: 16),
-      label: Text(text, maxLines: 1, overflow: TextOverflow.ellipsis),
-      backgroundColor: const Color(0xFF0B2447),
-      side: const BorderSide(color: Color(0xFF7DB7FF)),
-      visualDensity: VisualDensity.compact,
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF4F4F5),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: const Color(0xFFE0E0E3)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.schedule, size: 14, color: Color(0xFF6B6B70)),
+          const SizedBox(width: 5),
+          Text(
+            entry.appearance.appearanceText,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: Color(0xFF6B6B70),
+              fontWeight: FontWeight.w700,
+              fontSize: 12,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -782,16 +1513,17 @@ class _PrizeImage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final borderRadius = BorderRadius.circular(6);
+    final borderRadius = BorderRadius.circular(7);
     if (url == null || url!.isEmpty) {
       return Container(
         width: size,
         height: size,
         decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surfaceContainerHighest,
+          color: const Color(0xFFF0F0F2),
           borderRadius: borderRadius,
+          border: Border.all(color: const Color(0xFFE0E0E3)),
         ),
-        child: const Icon(Icons.inventory_2_outlined),
+        child: const Icon(Icons.inventory_2_outlined, color: Color(0xFF77777C)),
       );
     }
 
@@ -806,11 +1538,62 @@ class _PrizeImage extends StatelessWidget {
           return Container(
             width: size,
             height: size,
-            color: Theme.of(context).colorScheme.surfaceContainerHighest,
-            child: const Icon(Icons.broken_image_outlined),
+            color: const Color(0xFFF0F0F2),
+            child: const Icon(
+              Icons.broken_image_outlined,
+              color: Color(0xFF77777C),
+            ),
           );
         },
       ),
     );
   }
+}
+
+_StatusStyle _statusStyle(String status) {
+  switch (status) {
+    case PrizeStatus.owned:
+      return const _StatusStyle(
+        label: '獲得済み',
+        background: Color(0xFFE9F8EF),
+        border: Color(0xFFC4EBD0),
+        foreground: Color(0xFF1A7A42),
+      );
+    case PrizeStatus.reserved:
+      return const _StatusStyle(
+        label: '獲得予定',
+        background: Color(0xFFFFF4D8),
+        border: Color(0xFFF0D393),
+        foreground: Color(0xFF8A5B11),
+      );
+    case PrizeStatus.skipped:
+      return const _StatusStyle(
+        label: '見送り',
+        background: Color(0xFFF2F2F3),
+        border: Color(0xFFD8D8DC),
+        foreground: Color(0xFF696970),
+      );
+    case PrizeStatus.unowned:
+    default:
+      return const _StatusStyle(
+        label: '未獲得',
+        background: Color(0xFFF0F5FF),
+        border: Color(0xFFD3DFF5),
+        foreground: Color(0xFF38598C),
+      );
+  }
+}
+
+class _StatusStyle {
+  const _StatusStyle({
+    required this.label,
+    required this.background,
+    required this.border,
+    required this.foreground,
+  });
+
+  final String label;
+  final Color background;
+  final Color border;
+  final Color foreground;
 }

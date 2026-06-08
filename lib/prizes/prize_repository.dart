@@ -115,6 +115,27 @@ class PrizeRepository {
     return listPrizes(status: PrizeStatus.owned);
   }
 
+  Future<List<PrizeItem>> listAllPrizesSnapshot() {
+    final query = _database.select(_database.prizeItems)
+      ..orderBy([
+        (t) => OrderingTerm(
+          expression: t.releaseYear,
+          mode: OrderingMode.desc,
+          nulls: NullsOrder.last,
+        ),
+        (t) => OrderingTerm(
+          expression: t.releaseMonth,
+          mode: OrderingMode.desc,
+          nulls: NullsOrder.last,
+        ),
+        (t) => OrderingTerm(
+          expression: t.updatedAtEpochMs,
+          mode: OrderingMode.desc,
+        ),
+      ]);
+    return query.get();
+  }
+
   Future<List<PrizeItem>> upsertFromSource({PrizeSource? source}) async {
     final items = await (source ?? _source).fetchItems();
     final savedItems = <PrizeItem>[];

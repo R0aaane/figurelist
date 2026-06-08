@@ -53,45 +53,73 @@ class _MyAppState extends State<MyApp> {
 
   @override
   Widget build(BuildContext context) {
-    const darkBlue = Color.fromRGBO(2, 14, 38, 1);
-    const darkBlueSurface = Color(0xFF061633);
-    const darkBlueContainer = Color(0xFF0B2447);
-    const blueAccent = Color(0xFF7DB7FF);
+    const ink = Color(0xFF151518);
+    const paper = Color(0xFFFAFAFB);
+    const panel = Color(0xFFFFFFFF);
+    const subtle = Color(0xFFF4F4F5);
+    const accent = Color(0xFFFFC83D);
 
     return MaterialApp(
       title: 'FigureList',
       theme: ThemeData(
-        scaffoldBackgroundColor: darkBlue,
+        scaffoldBackgroundColor: paper,
         cardTheme: const CardThemeData(
-          color: darkBlueSurface,
+          color: panel,
           surfaceTintColor: Colors.transparent,
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.all(Radius.circular(8)),
+            side: BorderSide(color: Color(0xFFE3E3E6)),
+          ),
         ),
         appBarTheme: const AppBarTheme(
-          backgroundColor: darkBlue,
-          foregroundColor: Color(0xFFEAF2FF),
+          backgroundColor: panel,
+          foregroundColor: ink,
           surfaceTintColor: Colors.transparent,
+          elevation: 0,
         ),
         chipTheme: const ChipThemeData(
-          backgroundColor: darkBlueContainer,
-          selectedColor: Color(0xFF1B4F8F),
-          secondarySelectedColor: Color(0xFF1B4F8F),
-          labelStyle: TextStyle(color: Color(0xFFEAF2FF)),
-          secondaryLabelStyle: TextStyle(color: Color(0xFFEAF2FF)),
-          side: BorderSide(color: Color(0xFF2D5E9E)),
+          backgroundColor: subtle,
+          selectedColor: Color(0xFFE8E8EA),
+          secondarySelectedColor: Color(0xFFE8E8EA),
+          labelStyle: TextStyle(color: ink),
+          secondaryLabelStyle: TextStyle(color: ink),
+          side: BorderSide(color: Color(0xFFE0E0E3)),
         ),
         colorScheme:
             ColorScheme.fromSeed(
-              seedColor: blueAccent,
-              brightness: Brightness.dark,
+              seedColor: accent,
+              brightness: Brightness.light,
             ).copyWith(
-              surface: darkBlue,
-              surfaceContainer: darkBlueSurface,
-              surfaceContainerHighest: darkBlueContainer,
-              primary: blueAccent,
-              secondary: const Color(0xFF9CC9FF),
-              outline: const Color(0xFF8DAED9),
-              outlineVariant: const Color(0xFF31547F),
+              surface: paper,
+              surfaceContainer: panel,
+              surfaceContainerHighest: subtle,
+              primary: ink,
+              secondary: const Color(0xFF936411),
+              outline: const Color(0xFFCFCFD3),
+              outlineVariant: const Color(0xFFE7E7EA),
             ),
+        dividerTheme: const DividerThemeData(
+          color: Color(0xFFE7E7EA),
+          thickness: 1,
+          space: 1,
+        ),
+        inputDecorationTheme: InputDecorationTheme(
+          filled: true,
+          fillColor: panel,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(6),
+            borderSide: const BorderSide(color: Color(0xFFE1E1E4)),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(6),
+            borderSide: const BorderSide(color: Color(0xFFE1E1E4)),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(6),
+            borderSide: const BorderSide(color: Color(0xFF151518)),
+          ),
+        ),
         useMaterial3: true,
       ),
       home: PrizeListPage(
