@@ -38,8 +38,8 @@ class ServerSyncService {
   final AppDatabase _database;
   final _client = http.Client();
 
-  String appBaseUrl = 'http://localhost:4173';
-  String controlBaseUrl = 'http://localhost:4172';
+  String appBaseUrl = 'http://127.0.0.1:4173';
+  String controlBaseUrl = 'http://127.0.0.1:4172';
   String? _cookie;
   String? username;
 
@@ -50,6 +50,14 @@ class ServerSyncService {
       'content-type': 'application/json',
       ...?_cookie == null ? null : {'cookie': _cookie!},
     };
+  }
+
+  void setBaseUrls({
+    required String appBaseUrl,
+    required String controlBaseUrl,
+  }) {
+    this.appBaseUrl = _normalizeLoopbackBaseUrl(appBaseUrl);
+    this.controlBaseUrl = _normalizeLoopbackBaseUrl(controlBaseUrl);
   }
 
   Future<void> register({
@@ -73,9 +81,12 @@ class ServerSyncService {
     if (!await file.exists()) return false;
 
     try {
-      final json = jsonDecode(await file.readAsString()) as Map<String, dynamic>;
-      appBaseUrl = json['appBaseUrl'] as String? ?? appBaseUrl;
-      controlBaseUrl = json['controlBaseUrl'] as String? ?? controlBaseUrl;
+      final json =
+          jsonDecode(await file.readAsString()) as Map<String, dynamic>;
+      setBaseUrls(
+        appBaseUrl: json['appBaseUrl'] as String? ?? appBaseUrl,
+        controlBaseUrl: json['controlBaseUrl'] as String? ?? controlBaseUrl,
+      );
       _cookie = json['cookie'] as String?;
       username = json['username'] as String?;
       if (_cookie == null) return false;
@@ -129,7 +140,8 @@ class ServerSyncService {
     _throwIfFailed(response);
     _storeCookie(response);
     final body = jsonDecode(response.body) as Map<String, dynamic>;
-    this.username = (body['user'] as Map<String, dynamic>)['username'] as String;
+    this.username =
+        (body['user'] as Map<String, dynamic>)['username'] as String;
   }
 
   Future<void> logout() async {
@@ -149,18 +161,24 @@ class ServerSyncService {
   }
 
   Future<Map<String, dynamic>> serverStatus() async {
-    final response = await _client.get(_controlUri('/api/server/status'));
+    final response = await _controlRequest(
+      () => _client.get(_controlUri('/api/server/status')),
+    );
     _throwIfFailed(response);
     return jsonDecode(response.body) as Map<String, dynamic>;
   }
 
   Future<void> restartServer() async {
-    final response = await _client.post(_controlUri('/api/server/restart'));
+    final response = await _controlRequest(
+      () => _client.post(_controlUri('/api/server/restart')),
+    );
     _throwIfFailed(response);
   }
 
   Future<void> startServer() async {
-    final response = await _client.post(_controlUri('/api/server/start'));
+    final response = await _controlRequest(
+      () => _client.post(_controlUri('/api/server/start')),
+    );
     _throwIfFailed(response);
   }
 
@@ -182,9 +200,9 @@ class ServerSyncService {
     await _database.transaction(() async {
       for (final prize in prizes) {
         if (prize['status'] == 'hidden') {
-          await (_database.delete(_database.prizeItems)
-                ..where((t) => t.id.equals(prize['id'] as int)))
-              .go();
+          await (_database.delete(
+            _database.prizeItems,
+          )..where((t) => t.id.equals(prize['id'] as int))).go();
           continue;
         }
         await _database
@@ -210,9 +228,9 @@ class ServerSyncService {
       await _database
           .into(_database.prizeItems)
           .insertOnConflictUpdate(_prizeCompanion(prize));
-      await (_database.delete(_database.prizeAcquisitionLogs)
-            ..where((t) => t.prizeId.equals(prizeId)))
-          .go();
+      await (_database.delete(
+        _database.prizeAcquisitionLogs,
+      )..where((t) => t.prizeId.equals(prizeId))).go();
       for (final log in logs) {
         await _database
             .into(_database.prizeAcquisitionLogs)
@@ -364,6 +382,54 @@ class ServerSyncService {
   Uri _appUri(String path) => Uri.parse(appBaseUrl).resolve(path);
 
   Uri _controlUri(String path) => Uri.parse(controlBaseUrl).resolve(path);
+
+  String _normalizeLoopbackBaseUrl(String value) {
+    final trimmed = value.trim();
+    final uri = Uri.tryParse(trimmed);
+    if (uri == null || uri.host != 'localhost') return trimmed;
+    return uri.replace(host: '127.0.0.1').toString();
+  }
+
+  Future<http.Response> _controlRequest(
+    Future<http.Response> Function() request,
+  ) async {
+    try {
+      return await request();
+    } on SocketException {
+      if (!await _startLocalControlServer()) {
+        throw const ServerSyncException(
+          'サーバー管理機能に接続できません。Node.jsをインストールしてから、webappフォルダで `node supervisor.js` を起動してください。',
+        );
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 900));
+      try {
+        return await request();
+      } on SocketException {
+        throw const ServerSyncException(
+          'サーバー管理機能を起動できませんでした。Node.jsをインストールしてから、webappフォルダで `node supervisor.js` を起動してください。',
+        );
+      }
+    }
+  }
+
+  Future<bool> _startLocalControlServer() async {
+    final script = File(
+      p.join(Directory.current.path, 'webapp', 'supervisor.js'),
+    );
+    if (!await script.exists()) return false;
+
+    try {
+      await Process.start(
+        'node',
+        [script.path],
+        workingDirectory: script.parent.path,
+        mode: ProcessStartMode.detached,
+      );
+      return true;
+    } on Object {
+      return false;
+    }
+  }
 
   Future<File> _sessionFile() async {
     final directory = await getApplicationSupportDirectory();
