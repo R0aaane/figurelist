@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:drift/drift.dart';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
@@ -33,7 +34,13 @@ class FigureSearchResult {
 }
 
 class ServerSyncService {
-  ServerSyncService(this._database);
+  ServerSyncService(this._database) {
+    if (kIsWeb) {
+      final origin = Uri.base.origin;
+      appBaseUrl = origin;
+      controlBaseUrl = origin;
+    }
+  }
 
   final AppDatabase _database;
   final _client = http.Client();
@@ -44,7 +51,7 @@ class ServerSyncService {
   String? _cookie;
   String? username;
 
-  bool get isLoggedIn => username != null && _cookie != null;
+  bool get isLoggedIn => username != null && (kIsWeb || _cookie != null);
 
   Map<String, String> get _headers {
     return {
@@ -69,6 +76,16 @@ class ServerSyncService {
     await saveSession();
   }
 
+  Future<void> registerWithUsername(String username) async {
+    await _authenticate(
+      'register',
+      username: username,
+      password: '',
+      passwordless: true,
+    );
+    await saveSession();
+  }
+
   Future<void> login({
     required String username,
     required String password,
@@ -77,17 +94,42 @@ class ServerSyncService {
     await saveSession();
   }
 
+  Future<void> loginWithUsername(String username) async {
+    await _authenticate(
+      'login',
+      username: username,
+      password: '',
+      passwordless: true,
+    );
+    await saveSession();
+  }
+
   Future<bool> restoreSession() async {
+    if (kIsWeb) {
+      try {
+        final response = await _client.get(_appUri('/api/auth/session'));
+        if (response.statusCode != 200) return false;
+        final body = jsonDecode(response.body) as Map<String, dynamic>;
+        final user = body['user'] as Map<String, dynamic>?;
+        username = user?['username'] as String?;
+        return username != null;
+      } on Object {
+        return false;
+      }
+    }
+
     final file = await _sessionFile();
     if (!await file.exists()) return false;
 
     try {
       final json =
           jsonDecode(await file.readAsString()) as Map<String, dynamic>;
-      setBaseUrls(
-        appBaseUrl: json['appBaseUrl'] as String? ?? appBaseUrl,
-        controlBaseUrl: json['controlBaseUrl'] as String? ?? controlBaseUrl,
-      );
+      if (!kIsWeb) {
+        setBaseUrls(
+          appBaseUrl: json['appBaseUrl'] as String? ?? appBaseUrl,
+          controlBaseUrl: json['controlBaseUrl'] as String? ?? controlBaseUrl,
+        );
+      }
       _cookie = json['cookie'] as String?;
       username = json['username'] as String?;
       if (_cookie == null) return false;
@@ -116,6 +158,8 @@ class ServerSyncService {
   }
 
   Future<void> saveSession() async {
+    if (kIsWeb) return;
+
     final file = await _sessionFile();
     await file.parent.create(recursive: true);
     await file.writeAsString(
@@ -132,11 +176,16 @@ class ServerSyncService {
     String mode, {
     required String username,
     required String password,
+    bool passwordless = false,
   }) async {
     final response = await _client.post(
       _appUri('/api/auth/$mode'),
       headers: {'content-type': 'application/json'},
-      body: jsonEncode({'username': username, 'password': password}),
+      body: jsonEncode({
+        'username': username,
+        if (!passwordless) 'password': password,
+        if (passwordless) 'passwordless': true,
+      }),
     );
     _throwIfFailed(response);
     _storeCookie(response);
@@ -155,6 +204,8 @@ class ServerSyncService {
   }
 
   Future<void> clearSavedSession() async {
+    if (kIsWeb) return;
+
     final file = await _sessionFile();
     if (await file.exists()) {
       await file.delete();

@@ -551,6 +551,27 @@ function isAdmin(user) {
   return user?.username === 'admin';
 }
 
+function createPasswordlessUser(username) {
+  const passwordData = hashPassword(crypto.randomBytes(32).toString('hex'));
+  const result = db.prepare(`
+    INSERT INTO users (username, passwordSalt, passwordHash, createdAtEpochMs)
+    VALUES (?, ?, ?, ?)
+  `).run(username, passwordData.salt, passwordData.hash, now());
+  return { id: result.lastInsertRowid, username };
+}
+
+function sendAuthSession(res, user, status = 200) {
+  const session = createSession(user.id);
+  res.setHeader('set-cookie', sessionCookie(session));
+  return send(res, status, {
+    user: {
+      id: user.id,
+      username: user.username,
+      isAdmin: user.username === 'admin',
+    },
+  });
+}
+
 function getUserState(userId, prizeId) {
   return db.prepare('SELECT * FROM user_prize_states WHERE userId = ? AND prizeId = ?').get(userId, prizeId) || null;
 }
@@ -586,9 +607,21 @@ async function handleApi(req, res, url) {
   if (method === 'POST' && segments[0] === 'auth' && segments[1] === 'register') {
     const body = await readJson(req);
     const username = blank(body.username);
+    const passwordless = body.passwordless === true;
     const password = typeof body.password === 'string' ? body.password : '';
     if (!username || username.length < 3 || username.length > 32) {
       return sendError(res, 400, 'Username must be 3-32 characters');
+    }
+    if (passwordless) {
+      if (username === 'admin') {
+        return sendError(res, 403, 'Admin requires password login');
+      }
+      try {
+        const user = createPasswordlessUser(username);
+        return sendAuthSession(res, user, 201);
+      } catch (error) {
+        return sendError(res, 409, 'Username already exists');
+      }
     }
     if (password.length < 6) {
       return sendError(res, 400, 'Password must be at least 6 characters');
@@ -616,10 +649,20 @@ async function handleApi(req, res, url) {
   if (method === 'POST' && segments[0] === 'auth' && segments[1] === 'login') {
     const body = await readJson(req);
     const username = blank(body.username);
+    const passwordless = body.passwordless === true;
     const password = typeof body.password === 'string' ? body.password : '';
     const user = username
       ? db.prepare('SELECT * FROM users WHERE username = ?').get(username)
       : null;
+    if (passwordless) {
+      if (!user) {
+        return sendError(res, 401, 'User not found');
+      }
+      if (user.username === 'admin') {
+        return sendError(res, 403, 'Admin requires password login');
+      }
+      return sendAuthSession(res, user);
+    }
     if (!user || !verifyPassword(password, user.passwordSalt, user.passwordHash)) {
       return sendError(res, 401, 'Invalid username or password');
     }

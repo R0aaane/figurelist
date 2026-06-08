@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'server_sync_service.dart';
@@ -41,6 +42,10 @@ class _ServerAccountPageState extends State<ServerAccountPage> {
 
   @override
   Widget build(BuildContext context) {
+    if (kIsWeb) {
+      return _buildWebAccountPage();
+    }
+
     return Scaffold(
       appBar: AppBar(title: const Text('サーバー同期')),
       body: ListView(
@@ -134,6 +139,56 @@ class _ServerAccountPageState extends State<ServerAccountPage> {
     );
   }
 
+  Widget _buildWebAccountPage() {
+    return Scaffold(
+      appBar: AppBar(title: const Text('ログイン')),
+      body: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          TextField(
+            controller: _usernameController,
+            decoration: const InputDecoration(
+              labelText: 'Username',
+              border: OutlineInputBorder(),
+            ),
+            textInputAction: TextInputAction.done,
+            onSubmitted: (_) =>
+                _busy ? null : _authUsernameOnly(register: false),
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              FilledButton.icon(
+                onPressed: _busy
+                    ? null
+                    : () => _authUsernameOnly(register: false),
+                icon: const Icon(Icons.login),
+                label: const Text('ログイン'),
+              ),
+              OutlinedButton.icon(
+                onPressed: _busy
+                    ? null
+                    : () => _authUsernameOnly(register: true),
+                icon: const Icon(Icons.person_add),
+                label: const Text('登録'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          if (widget.service.isLoggedIn)
+            Text('ログイン中: ${widget.service.username}'),
+          if (_busy) const LinearProgressIndicator(),
+          if (_message != null) ...[
+            const SizedBox(height: 12),
+            Text(_message!),
+          ],
+        ],
+      ),
+    );
+  }
+
   Future<void> _auth({required bool register}) async {
     await _run(() async {
       _saveUrls();
@@ -147,6 +202,19 @@ class _ServerAccountPageState extends State<ServerAccountPage> {
           username: _usernameController.text.trim(),
           password: _passwordController.text,
         );
+      }
+      final count = await widget.service.syncFromServer();
+      return '${register ? '登録' : 'ログイン'}しました。$count件を同期しました。';
+    });
+  }
+
+  Future<void> _authUsernameOnly({required bool register}) async {
+    await _run(() async {
+      final username = _usernameController.text.trim();
+      if (register) {
+        await widget.service.registerWithUsername(username);
+      } else {
+        await widget.service.loginWithUsername(username);
       }
       final count = await widget.service.syncFromServer();
       return '${register ? '登録' : 'ログイン'}しました。$count件を同期しました。';
