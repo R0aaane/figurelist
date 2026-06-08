@@ -93,6 +93,7 @@ windows/**/*.cache
 webapp/node_modules/
 webapp/.npm/
 webapp/.pnpm-store/
+webapp/.cache/
 webapp/dist/
 webapp/build/
 webapp/coverage/
