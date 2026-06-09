@@ -76,31 +76,11 @@ class ServerSyncService {
     await saveSession();
   }
 
-  Future<void> registerWithUsername(String username) async {
-    await _authenticate(
-      'register',
-      username: username,
-      password: '',
-      passwordless: true,
-    );
-    await saveSession();
-  }
-
   Future<void> login({
     required String username,
     required String password,
   }) async {
     await _authenticate('login', username: username, password: password);
-    await saveSession();
-  }
-
-  Future<void> loginWithUsername(String username) async {
-    await _authenticate(
-      'login',
-      username: username,
-      password: '',
-      passwordless: true,
-    );
     await saveSession();
   }
 
@@ -176,16 +156,11 @@ class ServerSyncService {
     String mode, {
     required String username,
     required String password,
-    bool passwordless = false,
   }) async {
     final response = await _client.post(
       _appUri('/api/auth/$mode'),
       headers: {'content-type': 'application/json'},
-      body: jsonEncode({
-        'username': username,
-        if (!passwordless) 'password': password,
-        if (passwordless) 'passwordless': true,
-      }),
+      body: jsonEncode({'username': username, 'password': password}),
     );
     _throwIfFailed(response);
     _storeCookie(response);

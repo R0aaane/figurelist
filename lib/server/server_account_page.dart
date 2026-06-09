@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'server_sync_service.dart';
@@ -34,7 +33,7 @@ class _ServerAccountPageState extends State<ServerAccountPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text(kIsWeb ? 'ログイン' : 'サーバー同期')),
+      appBar: AppBar(title: const Text('ログイン')),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
@@ -44,70 +43,56 @@ class _ServerAccountPageState extends State<ServerAccountPage> {
               labelText: 'Username',
               border: OutlineInputBorder(),
             ),
-            textInputAction: kIsWeb
-                ? TextInputAction.done
-                : TextInputAction.next,
-            onSubmitted: (_) =>
-                kIsWeb && !_busy ? _authUsernameOnly(register: false) : null,
+            textInputAction: TextInputAction.next,
           ),
-          if (!kIsWeb) ...[
-            const SizedBox(height: 12),
-            TextField(
-              controller: _passwordController,
-              obscureText: true,
-              decoration: const InputDecoration(
-                labelText: 'Password',
-                border: OutlineInputBorder(),
-              ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _passwordController,
+            obscureText: true,
+            decoration: const InputDecoration(
+              labelText: 'Password',
+              border: OutlineInputBorder(),
             ),
-          ],
+            textInputAction: TextInputAction.done,
+            onSubmitted: (_) => _busy ? null : _auth(register: false),
+          ),
           const SizedBox(height: 12),
           Wrap(
             spacing: 8,
             runSpacing: 8,
             children: [
               FilledButton.icon(
-                onPressed: _busy
-                    ? null
-                    : () => kIsWeb
-                          ? _authUsernameOnly(register: false)
-                          : _auth(register: false),
+                onPressed: _busy ? null : () => _auth(register: false),
                 icon: const Icon(Icons.login),
                 label: const Text('ログイン'),
               ),
               OutlinedButton.icon(
-                onPressed: _busy
-                    ? null
-                    : () => kIsWeb
-                          ? _authUsernameOnly(register: true)
-                          : _auth(register: true),
+                onPressed: _busy ? null : () => _auth(register: true),
                 icon: const Icon(Icons.person_add),
                 label: const Text('登録'),
               ),
-              if (!kIsWeb) ...[
-                OutlinedButton.icon(
-                  onPressed: _busy ? null : _sync,
-                  icon: const Icon(Icons.sync),
-                  label: const Text('同期'),
-                ),
-                OutlinedButton.icon(
-                  onPressed: _busy ? null : _restartServer,
-                  icon: const Icon(Icons.restart_alt),
-                  label: const Text('サーバー再起動'),
-                ),
-                FilledButton.icon(
-                  onPressed: _busy ? null : _startCloudflare,
-                  icon: const Icon(Icons.cloud_upload_outlined),
-                  label: const Text('Cloudflare公開'),
-                ),
-                OutlinedButton.icon(
-                  onPressed: _busy || !widget.service.isCloudflareTunnelRunning
-                      ? null
-                      : _stopCloudflare,
-                  icon: const Icon(Icons.cloud_off_outlined),
-                  label: const Text('Cloudflare停止'),
-                ),
-              ],
+              OutlinedButton.icon(
+                onPressed: _busy ? null : _sync,
+                icon: const Icon(Icons.sync),
+                label: const Text('同期'),
+              ),
+              OutlinedButton.icon(
+                onPressed: _busy ? null : _restartServer,
+                icon: const Icon(Icons.restart_alt),
+                label: const Text('サーバー再起動'),
+              ),
+              FilledButton.icon(
+                onPressed: _busy ? null : _startCloudflare,
+                icon: const Icon(Icons.cloud_upload_outlined),
+                label: const Text('Cloudflare公開'),
+              ),
+              OutlinedButton.icon(
+                onPressed: _busy || !widget.service.isCloudflareTunnelRunning
+                    ? null
+                    : _stopCloudflare,
+                icon: const Icon(Icons.cloud_off_outlined),
+                label: const Text('Cloudflare停止'),
+              ),
             ],
           ),
           const SizedBox(height: 16),
@@ -135,19 +120,6 @@ class _ServerAccountPageState extends State<ServerAccountPage> {
           username: _usernameController.text.trim(),
           password: _passwordController.text,
         );
-      }
-      final count = await widget.service.syncFromServer();
-      return '${register ? '登録' : 'ログイン'}しました。$count件を同期しました。';
-    });
-  }
-
-  Future<void> _authUsernameOnly({required bool register}) async {
-    await _run(() async {
-      final username = _usernameController.text.trim();
-      if (register) {
-        await widget.service.registerWithUsername(username);
-      } else {
-        await widget.service.loginWithUsername(username);
       }
       final count = await widget.service.syncFromServer();
       return '${register ? '登録' : 'ログイン'}しました。$count件を同期しました。';
