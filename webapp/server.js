@@ -483,6 +483,50 @@ function send(res, status, value) {
   res.end(JSON.stringify(value));
 }
 
+async function proxyImage(res, imageUrl) {
+  let target;
+  try {
+    target = new URL(imageUrl);
+  } catch (_) {
+    return sendError(res, 400, 'Invalid image URL');
+  }
+
+  if (target.protocol !== 'http:' && target.protocol !== 'https:') {
+    return sendError(res, 400, 'Unsupported image URL');
+  }
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 15000);
+  try {
+    const response = await fetch(target, {
+      signal: controller.signal,
+      headers: {
+        'user-agent': 'Mozilla/5.0 FigureList image proxy',
+        accept: 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
+      },
+    });
+    if (!response.ok) {
+      return sendError(res, 502, `Image request failed: ${response.status}`);
+    }
+
+    const contentType = response.headers.get('content-type') || 'application/octet-stream';
+    if (!contentType.toLowerCase().startsWith('image/')) {
+      return sendError(res, 502, 'Proxied URL is not an image');
+    }
+
+    const buffer = Buffer.from(await response.arrayBuffer());
+    res.writeHead(200, {
+      'content-type': contentType,
+      'cache-control': 'public, max-age=86400',
+    });
+    res.end(buffer);
+  } catch (error) {
+    return sendError(res, 502, error.name === 'AbortError' ? 'Image request timed out' : 'Image request failed');
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 function sendError(res, status, message) {
   send(res, status, { error: message });
 }
@@ -646,6 +690,10 @@ async function handleApi(req, res, url) {
   const user = currentUser(req);
   if (!user) {
     return sendError(res, 401, 'Authentication required');
+  }
+
+  if (method === 'GET' && segments[0] === 'image-proxy') {
+    return proxyImage(res, url.searchParams.get('url') || '');
   }
 
   if (method === 'GET' && segments[0] === 'prizes' && segments.length === 1) {
@@ -1084,6 +1132,23 @@ async function searchFigureCandidates(query) {
 }
 
 function serveStatic(res, pathname) {
+  if (pathname === '/flutter_service_worker.js') {
+    res.writeHead(200, {
+      'content-type': 'text/javascript; charset=utf-8',
+      'cache-control': 'no-store, no-cache, must-revalidate, max-age=0'
+    });
+    return res.end(`self.addEventListener('install', event => self.skipWaiting());
+self.addEventListener('activate', event => {
+  event.waitUntil((async () => {
+    const keys = await caches.keys();
+    await Promise.all(keys.map(key => caches.delete(key)));
+    await self.registration.unregister();
+    const clientsList = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    for (const client of clientsList) client.navigate(client.url);
+  })());
+});`);
+  }
+
   const relative = pathname === '/' ? 'index.html' : pathname.slice(1);
   const filePath = path.normalize(path.join(publicDir, relative));
   if (!filePath.startsWith(publicDir)) {
@@ -1110,7 +1175,7 @@ function serveStatic(res, pathname) {
   };
   const headers = {
     'content-type': types[ext] || 'application/octet-stream',
-    'cache-control': 'no-cache'
+    'cache-control': 'no-store, no-cache, must-revalidate, max-age=0'
   };
   res.writeHead(200, headers);
   fs.createReadStream(filePath).pipe(res);

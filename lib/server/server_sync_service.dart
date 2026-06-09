@@ -498,7 +498,15 @@ class ServerSyncService {
   String? _absoluteImageUrl(String? value) {
     if (value == null || value.isEmpty) return value;
     final uri = Uri.tryParse(value);
-    if (uri != null && uri.hasScheme) return value;
+    if (uri != null && uri.hasScheme) {
+      if (!kIsWeb) return value;
+      final appOrigin = Uri.parse(appBaseUrl).origin;
+      if (uri.origin == appOrigin) return value;
+      if (uri.scheme != 'http' && uri.scheme != 'https') return value;
+      return _appUri(
+        '/api/image-proxy?url=${Uri.encodeComponent(value)}',
+      ).toString();
+    }
     return _appUri(value).toString();
   }
 

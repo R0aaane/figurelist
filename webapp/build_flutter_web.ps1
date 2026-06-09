@@ -187,6 +187,10 @@ if (-not (Test-Path -LiteralPath $flutterBuildDir)) {
 }
 
 Copy-Item -LiteralPath $flutterBuildDir -Destination $stageDir -Recurse
+Set-Content `
+  -LiteralPath (Join-Path $stageDir 'flutter_service_worker.js') `
+  -Encoding ASCII `
+  -Value "self.addEventListener('install', event => self.skipWaiting());`nself.addEventListener('activate', event => {`n  event.waitUntil((async () => {`n    const keys = await caches.keys();`n    await Promise.all(keys.map(key => caches.delete(key)));`n    await self.registration.unregister();`n    const clientsList = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });`n    for (const client of clientsList) client.navigate(client.url);`n  })());`n});"
 Ensure-SqliteWasm
 Copy-Item -LiteralPath $sqliteWasmCache -Destination (Join-Path $stageDir 'sqlite3.wasm') -Force
 
