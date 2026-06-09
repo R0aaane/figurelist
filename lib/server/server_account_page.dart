@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'server_sync_service.dart';
@@ -32,6 +33,8 @@ class _ServerAccountPageState extends State<ServerAccountPage> {
 
   @override
   Widget build(BuildContext context) {
+    final showServerControls = !kIsWeb || widget.service.isAdmin;
+
     return Scaffold(
       appBar: AppBar(title: const Text('ログイン')),
       body: ListView(
@@ -76,23 +79,25 @@ class _ServerAccountPageState extends State<ServerAccountPage> {
                 icon: const Icon(Icons.sync),
                 label: const Text('同期'),
               ),
-              OutlinedButton.icon(
-                onPressed: _busy ? null : _restartServer,
-                icon: const Icon(Icons.restart_alt),
-                label: const Text('サーバー再起動'),
-              ),
-              FilledButton.icon(
-                onPressed: _busy ? null : _startCloudflare,
-                icon: const Icon(Icons.cloud_upload_outlined),
-                label: const Text('Cloudflare公開'),
-              ),
-              OutlinedButton.icon(
-                onPressed: _busy || !widget.service.isCloudflareTunnelRunning
-                    ? null
-                    : _stopCloudflare,
-                icon: const Icon(Icons.cloud_off_outlined),
-                label: const Text('Cloudflare停止'),
-              ),
+              if (showServerControls) ...[
+                OutlinedButton.icon(
+                  onPressed: _busy ? null : _restartServer,
+                  icon: const Icon(Icons.restart_alt),
+                  label: const Text('サーバー再起動'),
+                ),
+                FilledButton.icon(
+                  onPressed: _busy ? null : _startCloudflare,
+                  icon: const Icon(Icons.cloud_upload_outlined),
+                  label: const Text('Cloudflare公開'),
+                ),
+                OutlinedButton.icon(
+                  onPressed: _busy || !widget.service.isCloudflareTunnelRunning
+                      ? null
+                      : _stopCloudflare,
+                  icon: const Icon(Icons.cloud_off_outlined),
+                  label: const Text('Cloudflare停止'),
+                ),
+              ],
             ],
           ),
           const SizedBox(height: 16),

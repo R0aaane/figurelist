@@ -50,6 +50,7 @@ class ServerSyncService {
   String controlBaseUrl = 'http://127.0.0.1:4172';
   String? _cookie;
   String? username;
+  bool isAdmin = false;
 
   bool get isLoggedIn => username != null && (kIsWeb || _cookie != null);
 
@@ -92,6 +93,7 @@ class ServerSyncService {
         final body = jsonDecode(response.body) as Map<String, dynamic>;
         final user = body['user'] as Map<String, dynamic>?;
         username = user?['username'] as String?;
+        isAdmin = user?['isAdmin'] == true;
         return username != null;
       } on Object {
         return false;
@@ -129,6 +131,7 @@ class ServerSyncService {
         return false;
       }
       username = user['username'] as String?;
+      isAdmin = user['isAdmin'] == true;
       await saveSession();
       return isLoggedIn;
     } on Object {
@@ -148,6 +151,7 @@ class ServerSyncService {
         'controlBaseUrl': controlBaseUrl,
         'cookie': _cookie,
         'username': username,
+        'isAdmin': isAdmin,
       }),
     );
   }
@@ -165,8 +169,9 @@ class ServerSyncService {
     _throwIfFailed(response);
     _storeCookie(response);
     final body = jsonDecode(response.body) as Map<String, dynamic>;
-    this.username =
-        (body['user'] as Map<String, dynamic>)['username'] as String;
+    final user = body['user'] as Map<String, dynamic>;
+    username = user['username'] as String;
+    isAdmin = user['isAdmin'] == true;
   }
 
   Future<void> logout() async {
@@ -175,6 +180,7 @@ class ServerSyncService {
     }
     _cookie = null;
     username = null;
+    isAdmin = false;
     await clearSavedSession();
   }
 
