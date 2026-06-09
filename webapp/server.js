@@ -1104,7 +1104,9 @@ function serveStatic(res, pathname) {
     '.jpeg': 'image/jpeg',
     '.webp': 'image/webp',
     '.gif': 'image/gif',
-    '.ico': 'image/x-icon'
+    '.ico': 'image/x-icon',
+    '.json': 'application/json; charset=utf-8',
+    '.wasm': 'application/wasm'
   };
   const headers = {
     'content-type': types[ext] || 'application/octet-stream',

@@ -19,6 +19,7 @@ $sqliteWasmUrl = 'https://github.com/simolus3/sqlite3.dart/releases/download/sql
 $driftWorkerEntry = Join-Path $projectRoot 'tool\drift_worker.dart'
 $driftWorker = Join-Path $stageDir 'drift_worker.js'
 $existingDriftWorker = Join-Path $publicDir 'drift_worker.js'
+$deployInfoFileName = 'deploy_info.json'
 
 function Get-TreeFingerprint([string]$Path) {
   if (-not (Test-Path -LiteralPath $Path)) {
@@ -105,6 +106,71 @@ function Restart-AppServer {
   }
 }
 
+function Get-GitCommit {
+  Push-Location $projectRoot
+  try {
+    return ((git rev-parse --short HEAD 2>$null) | Select-Object -First 1)
+  } catch {
+    return $null
+  } finally {
+    Pop-Location
+  }
+}
+
+function Write-DeployInfo([string]$Path) {
+  $mainJs = Join-Path $Path 'main.dart.js'
+  $mainHash = if (Test-Path -LiteralPath $mainJs) {
+    (Get-FileHash -Algorithm SHA256 -LiteralPath $mainJs).Hash
+  } else {
+    $null
+  }
+
+  $info = [ordered]@{
+    app = 'FigureList'
+    sourceCommit = Get-GitCommit
+    mainDartJsSha256 = $mainHash
+  }
+  $json = $info | ConvertTo-Json -Depth 3
+  Set-Content -LiteralPath (Join-Path $Path $deployInfoFileName) -Value $json -Encoding ASCII
+  return $info
+}
+
+function Test-ServedDeployInfo([object]$ExpectedInfo) {
+  $served = $null
+  for ($i = 0; $i -lt 10; $i++) {
+    try {
+      $served = Invoke-RestMethod `
+        -Uri "http://127.0.0.1:4173/$deployInfoFileName" `
+        -UseBasicParsing `
+        -TimeoutSec 5
+      if ($served -is [string]) {
+        $served = $served | ConvertFrom-Json
+      }
+      break
+    } catch {
+      Start-Sleep -Milliseconds 500
+    }
+  }
+
+  if ($null -eq $served) {
+    Write-Warning "Could not verify http://127.0.0.1:4173/$deployInfoFileName. The app server may not be running or may be serving a different folder."
+    return
+  }
+
+  try {
+    if ($served.mainDartJsSha256 -eq $ExpectedInfo.mainDartJsSha256 -and
+        $served.sourceCommit -eq $ExpectedInfo.sourceCommit) {
+      Write-Host "Verified local web server is serving this build."
+    } else {
+      Write-Warning "Local web server is reachable, but it is serving a different build. Check which process owns port 4173 and which webapp folder it was started from."
+      Write-Warning "Expected commit=$($ExpectedInfo.sourceCommit), main=$($ExpectedInfo.mainDartJsSha256)"
+      Write-Warning "Served   commit=$($served.sourceCommit), main=$($served.mainDartJsSha256)"
+    }
+  } catch {
+    Write-Warning "Could not verify http://127.0.0.1:4173/$deployInfoFileName. The app server may not be running or may be serving a different folder."
+  }
+}
+
 New-Item -ItemType Directory -Force -Path $tempRoot | Out-Null
 Remove-Item -LiteralPath $stageDir -Recurse -Force -ErrorAction SilentlyContinue
 
@@ -137,12 +203,14 @@ if ((Test-Path -LiteralPath $existingDriftWorker) -and -not $ForceWorkerBuild) {
 }
 Remove-Item -LiteralPath "$driftWorker.deps" -Force -ErrorAction SilentlyContinue
 Remove-Item -LiteralPath "$driftWorker.map" -Force -ErrorAction SilentlyContinue
+$deployInfo = Write-DeployInfo $stageDir
 
 $oldFingerprint = Get-TreeFingerprint $publicDir
 $newFingerprint = Get-TreeFingerprint $stageDir
 
 if ($oldFingerprint -eq $newFingerprint) {
   Write-Host "Cloudflare public assets are already up to date."
+  Test-ServedDeployInfo $deployInfo
   Remove-Item -LiteralPath $stageDir -Recurse -Force -ErrorAction SilentlyContinue
   Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue
   exit 0
@@ -165,3 +233,4 @@ if (Test-Path -LiteralPath $uploadsBackup) {
 Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue
 Write-Host "Updated Cloudflare public assets from build\web."
 Restart-AppServer
+Test-ServedDeployInfo $deployInfo
