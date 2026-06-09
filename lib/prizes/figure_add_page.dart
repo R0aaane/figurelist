@@ -1,7 +1,7 @@
 import 'dart:math' as math;
-import 'dart:typed_data';
 
 import 'package:file_selector/file_selector.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:image/image.dart' as image_lib;
@@ -62,9 +62,7 @@ class _FigureAddPageState extends State<FigureAddPage> {
             onIdentify: _findSimilarLocalImages,
           ),
           const SizedBox(height: 12),
-          const Text(
-            '登録済みフィギュアの画像と照合します。近い候補がない場合は下の手動追加に名前を入力してください。',
-          ),
+          const Text('登録済みフィギュアの画像と照合します。近い候補がない場合は下の手動追加に名前を入力してください。'),
           const SizedBox(height: 12),
           for (final candidate in _similarResults)
             Card(
@@ -81,7 +79,9 @@ class _FigureAddPageState extends State<FigureAddPage> {
                   ].join('\n'),
                 ),
                 trailing: FilledButton(
-                  onPressed: _busy ? null : () => _useSimilarCandidate(candidate),
+                  onPressed: _busy
+                      ? null
+                      : () => _useSimilarCandidate(candidate),
                   child: const Text('この名前を使う'),
                 ),
               ),
@@ -119,14 +119,9 @@ class _FigureAddPageState extends State<FigureAddPage> {
           ),
           const SizedBox(height: 16),
           if (!loggedIn)
-            const Text(
-              'サーバ検索、共有リストへの追加にはログインが必要です。未ログイン時はローカルへの手動追加のみできます。',
-            ),
+            const Text('サーバ検索、共有リストへの追加にはログインが必要です。未ログイン時はローカルへの手動追加のみできます。'),
           if (_busy) const LinearProgressIndicator(),
-          if (_message != null) ...[
-            const SizedBox(height: 8),
-            Text(_message!),
-          ],
+          if (_message != null) ...[const SizedBox(height: 8), Text(_message!)],
           const SizedBox(height: 12),
           for (final result in _results)
             Card(
@@ -209,7 +204,9 @@ class _FigureAddPageState extends State<FigureAddPage> {
       final prizes = await widget.repository.listAllPrizesSnapshot();
       final candidates = <_SimilarFigureCandidate>[];
       final imagePrizes = prizes
-          .where((prize) => prize.imageUrl != null && prize.imageUrl!.isNotEmpty)
+          .where(
+            (prize) => prize.imageUrl != null && prize.imageUrl!.isNotEmpty,
+          )
           .take(120);
 
       for (final prize in imagePrizes) {
@@ -336,9 +333,7 @@ class _FigureAddPageState extends State<FigureAddPage> {
   Future<void> _openWebSearch(String query) async {
     final trimmed = query.trim();
     if (trimmed.isEmpty) return;
-    final uri = Uri.https('www.google.com', '/search', {
-      'q': '$trimmed フィギュア',
-    });
+    final uri = Uri.https('www.google.com', '/search', {'q': '$trimmed フィギュア'});
     await launchUrl(uri, mode: LaunchMode.externalApplication);
   }
 
@@ -387,15 +382,13 @@ class _FigureAddPageState extends State<FigureAddPage> {
 }
 
 class _SimilarFigureCandidate {
-  const _SimilarFigureCandidate({
-    required this.prize,
-    required this.distance,
-  });
+  const _SimilarFigureCandidate({required this.prize, required this.distance});
 
   final PrizeItem prize;
   final int distance;
 
-  int get similarityPercent => math.max(0, ((64 - distance) / 64 * 100).round());
+  int get similarityPercent =>
+      math.max(0, ((64 - distance) / 64 * 100).round());
 }
 
 class _ImagePickerPanel extends StatelessWidget {
@@ -490,11 +483,22 @@ class _SearchResultImage extends StatelessWidget {
       width: 56,
       height: 56,
       child: Image.network(
-        value,
+        _displayImageUrl(value),
         fit: BoxFit.contain,
         errorBuilder: (context, error, stackTrace) =>
             const Icon(Icons.image_not_supported),
       ),
     );
   }
+}
+
+String _displayImageUrl(String value) {
+  if (!kIsWeb) return value;
+  final uri = Uri.tryParse(value);
+  if (uri == null || !uri.hasScheme) return value;
+  if (uri.scheme != 'http' && uri.scheme != 'https') return value;
+  if (uri.origin == Uri.base.origin) return value;
+  return Uri.base
+      .resolve('/api/image-proxy?url=${Uri.encodeComponent(value)}')
+      .toString();
 }

@@ -328,9 +328,7 @@ class ServerSyncService {
           )..where((t) => t.id.equals(prize['id'] as int))).go();
           continue;
         }
-        await _database
-            .into(_database.prizeItems)
-            .insertOnConflictUpdate(_prizeCompanion(prize));
+        await _upsertPrizeFromServer(prize);
       }
     });
     return prizes.length;
@@ -348,9 +346,7 @@ class ServerSyncService {
     final logs = (body['logs'] as List<dynamic>).cast<Map<String, dynamic>>();
 
     await _database.transaction(() async {
-      await _database
-          .into(_database.prizeItems)
-          .insertOnConflictUpdate(_prizeCompanion(prize));
+      await _upsertPrizeFromServer(prize);
       await (_database.delete(
         _database.prizeAcquisitionLogs,
       )..where((t) => t.prizeId.equals(prizeId))).go();
@@ -462,8 +458,29 @@ class ServerSyncService {
     _throwIfFailed(response);
   }
 
-  PrizeItemsCompanion _prizeCompanion(Map<String, dynamic> json) {
+  Future<void> _upsertPrizeFromServer(Map<String, dynamic> json) async {
+    final id = json['id'] as int;
+    final existing =
+        await (_database.select(_database.prizeItems)
+              ..where((t) => t.id.equals(id))
+              ..limit(1))
+            .getSingleOrNull();
+    await _database
+        .into(_database.prizeItems)
+        .insertOnConflictUpdate(
+          _prizeCompanion(json, fallbackImageUrl: existing?.imageUrl),
+        );
+  }
+
+  PrizeItemsCompanion _prizeCompanion(
+    Map<String, dynamic> json, {
+    String? fallbackImageUrl,
+  }) {
     final now = DateTime.now().millisecondsSinceEpoch;
+    final serverImageUrl = _absoluteImageUrl(json['imageUrl'] as String?);
+    final imageUrl = serverImageUrl == null || serverImageUrl.isEmpty
+        ? fallbackImageUrl
+        : serverImageUrl;
     return PrizeItemsCompanion.insert(
       id: Value(json['id'] as int),
       title: json['title'] as String,
@@ -475,7 +492,7 @@ class ServerSyncService {
       releaseYear: Value(json['releaseYear'] as int?),
       releaseMonth: Value(json['releaseMonth'] as int?),
       sourceUrl: Value(json['sourceUrl'] as String?),
-      imageUrl: Value(_absoluteImageUrl(json['imageUrl'] as String?)),
+      imageUrl: Value(imageUrl),
       status: Value(json['status'] as String? ?? PrizeStatus.unowned),
       memo: Value(json['memo'] as String?),
       acquiredAtEpochMs: Value(json['acquiredAtEpochMs'] as int?),

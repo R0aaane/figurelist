@@ -517,6 +517,7 @@ class PrizeRepository {
   }
 
   PrizeItemsCompanion _companionForSourceUpdate(PrizeSourceItem item, int now) {
+    final imageUrl = _blankToNull(item.imageUrl);
     return PrizeItemsCompanion(
       title: Value(item.title),
       workTitle: Value(item.workTitle),
@@ -527,7 +528,7 @@ class PrizeRepository {
       releaseYear: Value(item.releaseYear),
       releaseMonth: Value(item.releaseMonth),
       sourceUrl: Value(_blankToNull(item.sourceUrl)),
-      imageUrl: Value(_blankToNull(item.imageUrl)),
+      imageUrl: imageUrl == null ? const Value.absent() : Value(imageUrl),
       updatedAtEpochMs: Value(now),
     );
   }
@@ -582,11 +583,13 @@ class PrizeRepository {
   Future<PrizeStoreAppearance?> _findExistingAppearance(
     PrizeStoreAppearanceSourceItem appearance,
   ) {
-    return (_database.select(_database.prizeStoreAppearances)..where(
-          (t) =>
-              t.prizeId.equals(appearance.prizeId) &
-              t.storeId.equals(appearance.storeId),
-        )..limit(1))
+    return (_database.select(_database.prizeStoreAppearances)
+          ..where(
+            (t) =>
+                t.prizeId.equals(appearance.prizeId) &
+                t.storeId.equals(appearance.storeId),
+          )
+          ..limit(1))
         .getSingleOrNull();
   }
 

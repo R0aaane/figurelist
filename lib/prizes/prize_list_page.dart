@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../data/app_database.dart';
@@ -1583,7 +1584,7 @@ class _PrizeImage extends StatelessWidget {
     return ClipRRect(
       borderRadius: borderRadius,
       child: Image.network(
-        url!,
+        _displayImageUrl(url!),
         width: size,
         height: size,
         fit: BoxFit.cover,
@@ -1601,6 +1602,17 @@ class _PrizeImage extends StatelessWidget {
       ),
     );
   }
+}
+
+String _displayImageUrl(String value) {
+  if (!kIsWeb) return value;
+  final uri = Uri.tryParse(value);
+  if (uri == null || !uri.hasScheme) return value;
+  if (uri.scheme != 'http' && uri.scheme != 'https') return value;
+  if (uri.origin == Uri.base.origin) return value;
+  return Uri.base
+      .resolve('/api/image-proxy?url=${Uri.encodeComponent(value)}')
+      .toString();
 }
 
 _StatusStyle _statusStyle(String status) {

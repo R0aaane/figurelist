@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -208,15 +209,14 @@ class _PrizeDetailPageState extends State<PrizeDetailPage> {
               Align(
                 alignment: Alignment.centerRight,
                 child: FilledButton.icon(
-                  onPressed: () => widget.repository.updateMemo(
-                    prize.id,
-                    _memoController.text,
-                  ).then(
-                    (_) => widget.serverSyncService?.updateMemo(
-                      prize.id,
-                      _memoController.text,
-                    ),
-                  ),
+                  onPressed: () => widget.repository
+                      .updateMemo(prize.id, _memoController.text)
+                      .then(
+                        (_) => widget.serverSyncService?.updateMemo(
+                          prize.id,
+                          _memoController.text,
+                        ),
+                      ),
                   icon: const Icon(Icons.save),
                   label: const Text('\u30e1\u30e2\u3092\u4fdd\u5b58'),
                 ),
@@ -275,7 +275,7 @@ class _BoxImage extends StatelessWidget {
                     child: const Icon(Icons.inventory_2_outlined, size: 48),
                   )
                 : Image.network(
-                    url!,
+                    _displayImageUrl(url!),
                     fit: BoxFit.contain,
                     errorBuilder: (context, error, stackTrace) {
                       return Container(
@@ -294,6 +294,17 @@ class _BoxImage extends StatelessWidget {
       ],
     );
   }
+}
+
+String _displayImageUrl(String value) {
+  if (!kIsWeb) return value;
+  final uri = Uri.tryParse(value);
+  if (uri == null || !uri.hasScheme) return value;
+  if (uri.scheme != 'http' && uri.scheme != 'https') return value;
+  if (uri.origin == Uri.base.origin) return value;
+  return Uri.base
+      .resolve('/api/image-proxy?url=${Uri.encodeComponent(value)}')
+      .toString();
 }
 
 class _InfoRow extends StatelessWidget {
