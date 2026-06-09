@@ -111,7 +111,7 @@ Remove-Item -LiteralPath $stageDir -Recurse -Force -ErrorAction SilentlyContinue
 Push-Location $projectRoot
 try {
   Write-Host "Running flutter build web..."
-  flutter build web --release --no-wasm-dry-run
+  flutter build web --release --no-wasm-dry-run --pwa-strategy=none
 } finally {
   Pop-Location
 }
