@@ -197,6 +197,9 @@ class _PrizeListPageState extends State<PrizeListPage> {
   }
 
   Future<void> _updatePrizeStatus(PrizeItem prize, String status) async {
+    if (prize.status == status) {
+      return;
+    }
     await widget.repository.updateStatus(prize.id, status);
     await widget.serverSyncService?.updateStatus(prize.id, status);
     await widget.notificationService.rescheduleArrivalNotifications(
@@ -1324,7 +1327,12 @@ class _PrizeTile extends StatelessWidget {
                           runSpacing: 6,
                           crossAxisAlignment: WrapCrossAlignment.center,
                           children: [
-                            _PrizeStatusPill(status: prize.status),
+                            _PrizeStatusPill(
+                              status: prize.status,
+                              onTap: () => onStatusSelected(
+                                _nextPrizeStatus(prize.status),
+                              ),
+                            ),
                             if (appearance != null)
                               _ArrivalPill(entry: appearance!),
                           ],
@@ -1371,28 +1379,10 @@ class _PrizeTile extends StatelessWidget {
         Rect.fromLTWH(position.dx, position.dy, 1, 1),
         Offset.zero & overlay.size,
       ),
-      items: const [
-        PopupMenuItem(
-          value: _PrizeAction.markOwned,
-          child: ListTile(leading: Icon(Icons.check), title: Text('獲得済みにする')),
-        ),
-        PopupMenuItem(
-          value: _PrizeAction.markUnowned,
-          child: ListTile(leading: Icon(Icons.undo), title: Text('未獲得に戻す')),
-        ),
-        PopupMenuItem(
-          value: _PrizeAction.markReserved,
-          child: ListTile(
-            leading: Icon(Icons.event_available),
-            title: Text('獲得予定にする'),
-          ),
-        ),
-        PopupMenuItem(
-          value: _PrizeAction.markSkipped,
-          child: ListTile(leading: Icon(Icons.block), title: Text('見送りにする')),
-        ),
-        PopupMenuDivider(),
-        PopupMenuItem(
+      items: [
+        ..._statusMenuItems(prize.status),
+        const PopupMenuDivider(),
+        const PopupMenuItem(
           value: _PrizeAction.delete,
           child: ListTile(
             leading: Icon(Icons.delete_outline),
@@ -1442,26 +1432,37 @@ class _CloudBadge extends StatelessWidget {
 }
 
 class _PrizeStatusPill extends StatelessWidget {
-  const _PrizeStatusPill({required this.status});
+  const _PrizeStatusPill({required this.status, required this.onTap});
 
   final String status;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final style = _statusStyle(status);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: style.background,
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: style.border),
-      ),
-      child: Text(
-        style.label,
-        style: TextStyle(
-          color: style.foreground,
-          fontWeight: FontWeight.w700,
-          fontSize: 12,
+    return Tooltip(
+      message: '次の状態に変更',
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(999),
+          child: Ink(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: style.background,
+              borderRadius: BorderRadius.circular(999),
+              border: Border.all(color: style.border),
+            ),
+            child: Text(
+              style.label,
+              style: TextStyle(
+                color: style.foreground,
+                fontWeight: FontWeight.w700,
+                fontSize: 12,
+              ),
+            ),
+          ),
         ),
       ),
     );
@@ -1504,6 +1505,58 @@ class _ArrivalPill extends StatelessWidget {
 }
 
 enum _PrizeAction { markOwned, markUnowned, markReserved, markSkipped, delete }
+
+const _statusCycle = [
+  PrizeStatus.unowned,
+  PrizeStatus.owned,
+  PrizeStatus.reserved,
+  PrizeStatus.skipped,
+];
+
+String _nextPrizeStatus(String status) {
+  final index = _statusCycle.indexOf(status);
+  if (index == -1) {
+    return PrizeStatus.unowned;
+  }
+  return _statusCycle[(index + 1) % _statusCycle.length];
+}
+
+List<PopupMenuEntry<_PrizeAction>> _statusMenuItems(String currentStatus) {
+  return [
+    if (currentStatus != PrizeStatus.owned)
+      PopupMenuItem(
+        value: _PrizeAction.markOwned,
+        child: ListTile(
+          leading: const Icon(Icons.check),
+          title: Text('${PrizeStatus.label(PrizeStatus.owned)}にする'),
+        ),
+      ),
+    if (currentStatus != PrizeStatus.unowned)
+      PopupMenuItem(
+        value: _PrizeAction.markUnowned,
+        child: ListTile(
+          leading: const Icon(Icons.undo),
+          title: Text('${PrizeStatus.label(PrizeStatus.unowned)}にする'),
+        ),
+      ),
+    if (currentStatus != PrizeStatus.reserved)
+      PopupMenuItem(
+        value: _PrizeAction.markReserved,
+        child: ListTile(
+          leading: const Icon(Icons.event_available),
+          title: Text('${PrizeStatus.label(PrizeStatus.reserved)}にする'),
+        ),
+      ),
+    if (currentStatus != PrizeStatus.skipped)
+      PopupMenuItem(
+        value: _PrizeAction.markSkipped,
+        child: ListTile(
+          leading: const Icon(Icons.block),
+          title: Text('${PrizeStatus.label(PrizeStatus.skipped)}にする'),
+        ),
+      ),
+  ];
+}
 
 class _PrizeImage extends StatelessWidget {
   const _PrizeImage({required this.url, required this.size});
