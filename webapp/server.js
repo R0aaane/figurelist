@@ -762,11 +762,46 @@ async function handleApi(req, res, url) {
     return send(res, 200, await searchFigureCandidates(query));
   }
 
+  if (method === 'GET' && segments[0] === 'figure-url') {
+    const sourceUrl = blank(url.searchParams.get('url'));
+    if (!sourceUrl) return sendError(res, 400, 'URL is required');
+    return send(res, 200, await extractFigureCandidatesFromUrl(sourceUrl));
+  }
+
   if (method === 'POST' && segments[0] === 'prizes' && segments.length === 1) {
     const body = await readJson(req);
     const title = blank(body.title);
     if (!title) return sendError(res, 400, 'Title is required');
+    const sourceUrl = blank(body.sourceUrl);
     const createdAt = now();
+    const existing = sourceUrl
+      ? db.prepare('SELECT * FROM prize_items WHERE ownerUserId = ? AND sourceUrl = ?').get(user.id, sourceUrl)
+      : null;
+    if (existing) {
+      const before = { ...existing };
+      db.prepare(`
+        UPDATE prize_items SET
+          title = ?, workTitle = ?, characterName = ?, seriesName = ?, maker = ?,
+          releaseText = ?, releaseYear = ?, releaseMonth = ?, imageUrl = COALESCE(?, imageUrl),
+          updatedAtEpochMs = ?
+        WHERE id = ?
+      `).run(
+        title,
+        blank(body.workTitle) || title,
+        blank(body.characterName) || title,
+        blank(body.seriesName) || existing.seriesName,
+        blank(body.maker) || existing.maker,
+        blank(body.releaseText) || existing.releaseText,
+        Number.isInteger(body.releaseYear) ? body.releaseYear : existing.releaseYear,
+        Number.isInteger(body.releaseMonth) ? body.releaseMonth : existing.releaseMonth,
+        blank(body.imageUrl),
+        createdAt,
+        existing.id
+      );
+      const after = getRow('prize_items', existing.id);
+      recordAudit('prize_items', existing.id, 'manual_update', before, after, user.id);
+      return send(res, 200, getPrizeForUser(user.id, existing.id));
+    }
     const result = db.prepare(`
       INSERT INTO prize_items (
         ownerUserId, title, workTitle, characterName, seriesName, maker, releaseText,
@@ -783,7 +818,7 @@ async function handleApi(req, res, url) {
       blank(body.releaseText) || '未設定',
       Number.isInteger(body.releaseYear) ? body.releaseYear : null,
       Number.isInteger(body.releaseMonth) ? body.releaseMonth : null,
-      blank(body.sourceUrl),
+      sourceUrl,
       blank(body.imageUrl),
       createdAt,
       createdAt
@@ -1089,6 +1124,142 @@ async function findPageImage(sourceUrl) {
   } finally {
     clearTimeout(timeout);
   }
+}
+
+async function fetchHtmlPage(sourceUrl, timeoutMs = 8000) {
+  const parsed = new URL(sourceUrl);
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    throw new Error('Only HTTP URLs are supported');
+  }
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(parsed.href, {
+      signal: controller.signal,
+      headers: {
+        'user-agent': 'FigureList/1.0 figure URL import',
+        accept: 'text/html,*/*',
+      },
+    });
+    if (!response.ok) {
+      throw new Error(`URL request failed: ${response.status}`);
+    }
+    return await response.text();
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+function parseReleaseText(value) {
+  const text = blank(value);
+  if (!text) return { releaseText: null, releaseYear: null, releaseMonth: null };
+  const year = text.match(/(20\d{2})年/);
+  const month = text.match(/年\s*0?(\d{1,2})月|0?(\d{1,2})月/);
+  return {
+    releaseText: text,
+    releaseYear: year ? Number(year[1]) : null,
+    releaseMonth: month ? Number(month[1] || month[2]) : null,
+  };
+}
+
+function inferSeriesName(title) {
+  const normalized = title.replace(/\s+/g, ' ').trim();
+  const markers = [' フィギュア ', ' Figure', ' figure'];
+  for (const marker of markers) {
+    const index = normalized.indexOf(marker);
+    if (index > 0) {
+      return normalized.slice(0, index + marker.length).trim();
+    }
+  }
+  return 'URL追加';
+}
+
+function inferCharacterName(title, seriesName) {
+  const value = title.replace(seriesName, '').replace(/[ー～~\-]+/g, ' ').trim();
+  return value || title;
+}
+
+function extractDefinition(html, label) {
+  const pattern = new RegExp(`<dt>\\s*■?${label}\\s*[:：]?\\s*<\\/dt>\\s*<dd>([\\s\\S]*?)<\\/dd>`, 'i');
+  return blank(htmlDecode(html.match(pattern)?.[1] || ''));
+}
+
+function extractGamepediaFigures(html, sourceUrl) {
+  const candidates = [];
+  const seen = new Set();
+  const blockPattern = /<div class="hobby-prize-two-rows">([\s\S]*?)<\/div>\s*<div class="text-center"/g;
+  for (const match of html.matchAll(blockPattern)) {
+    const block = match[1];
+    const title = blank(htmlDecode(block.match(/<div class="media-heading">([\s\S]*?)<\/div>/i)?.[1] || ''));
+    if (!title || seen.has(title)) continue;
+    const imageUrl = resolveMaybeUrl(
+      block.match(/<img[^>]+class="image-popup"[^>]+(?:src|data-src)=["']([^"']+)["']/i)?.[1]
+        || block.match(/<img[^>]+(?:src|data-src)=["']([^"']+)["'][^>]*class="image-popup"/i)?.[1],
+      sourceUrl
+    );
+    const linkedSource = resolveMaybeUrl(
+      block.match(/<cite>[\s\S]*?<a[^>]+href=["']([^"']+)["']/i)?.[1],
+      sourceUrl
+    );
+    const maker = extractDefinition(block, 'メーカー');
+    const release = parseReleaseText(extractDefinition(block, '投入時期'));
+    const seriesName = inferSeriesName(title);
+    candidates.push({
+      title,
+      workTitle: title,
+      characterName: inferCharacterName(title, seriesName),
+      seriesName,
+      maker,
+      ...release,
+      sourceUrl: linkedSource || sourceUrl,
+      snippet: [maker, release.releaseText].filter(Boolean).join(' / ') || null,
+      imageUrl,
+    });
+    seen.add(title);
+  }
+  return candidates;
+}
+
+function extractGenericFigure(html, sourceUrl) {
+  const title = blank(htmlDecode(
+    html.match(/<meta[^>]+(?:property|name)=["'](?:og:title|twitter:title)["'][^>]+content=["']([^"']+)["'][^>]*>/i)?.[1]
+      || html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1]
+      || ''
+  ));
+  if (!title) return [];
+  const imageUrl = resolveMaybeUrl(
+    html.match(/<meta[^>]+(?:property|name)=["'](?:og:image|twitter:image)["'][^>]+content=["']([^"']+)["'][^>]*>/i)?.[1],
+    sourceUrl
+  );
+  const cleanedTitle = title.replace(/\s*[–|-]\s*.*$/, '').trim();
+  return [{
+    title: cleanedTitle,
+    workTitle: cleanedTitle,
+    characterName: cleanedTitle,
+    seriesName: 'URL追加',
+    maker: null,
+    releaseText: null,
+    releaseYear: null,
+    releaseMonth: null,
+    sourceUrl,
+    snippet: title,
+    imageUrl,
+  }];
+}
+
+async function extractFigureCandidatesFromUrl(sourceUrl) {
+  let parsed;
+  try {
+    parsed = new URL(sourceUrl);
+  } catch (_) {
+    throw new Error('Invalid URL');
+  }
+  const html = await fetchHtmlPage(parsed.href);
+  if (parsed.hostname.endsWith('gamepedia.jp')) {
+    const gamepedia = extractGamepediaFigures(html, parsed.href);
+    if (gamepedia.length > 0) return gamepedia;
+  }
+  return extractGenericFigure(html, parsed.href);
 }
 
 async function searchPrizeCandidates(trimmed) {

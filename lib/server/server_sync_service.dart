@@ -22,12 +22,26 @@ class ServerSyncException implements Exception {
 class FigureSearchResult {
   const FigureSearchResult({
     required this.title,
+    this.workTitle,
+    this.characterName,
+    this.seriesName,
+    this.maker,
+    this.releaseText,
+    this.releaseYear,
+    this.releaseMonth,
     this.sourceUrl,
     this.snippet,
     this.imageUrl,
   });
 
   final String title;
+  final String? workTitle;
+  final String? characterName;
+  final String? seriesName;
+  final String? maker;
+  final String? releaseText;
+  final int? releaseYear;
+  final int? releaseMonth;
   final String? sourceUrl;
   final String? snippet;
   final String? imageUrl;
@@ -418,6 +432,40 @@ class ServerSyncService {
         .map(
           (json) => FigureSearchResult(
             title: json['title'] as String,
+            workTitle: json['workTitle'] as String?,
+            characterName: json['characterName'] as String?,
+            seriesName: json['seriesName'] as String?,
+            maker: json['maker'] as String?,
+            releaseText: json['releaseText'] as String?,
+            releaseYear: json['releaseYear'] as int?,
+            releaseMonth: json['releaseMonth'] as int?,
+            sourceUrl: json['sourceUrl'] as String?,
+            snippet: json['snippet'] as String?,
+            imageUrl: _absoluteImageUrl(json['imageUrl'] as String?),
+          ),
+        )
+        .toList(growable: false);
+  }
+
+  Future<List<FigureSearchResult>> fetchFiguresFromUrl(String url) async {
+    _requireLogin();
+    final response = await _client.get(
+      _appUri('/api/figure-url?url=${Uri.encodeQueryComponent(url)}'),
+      headers: _headers,
+    );
+    _throwIfFailed(response);
+    return (jsonDecode(response.body) as List<dynamic>)
+        .cast<Map<String, dynamic>>()
+        .map(
+          (json) => FigureSearchResult(
+            title: json['title'] as String,
+            workTitle: json['workTitle'] as String?,
+            characterName: json['characterName'] as String?,
+            seriesName: json['seriesName'] as String?,
+            maker: json['maker'] as String?,
+            releaseText: json['releaseText'] as String?,
+            releaseYear: json['releaseYear'] as int?,
+            releaseMonth: json['releaseMonth'] as int?,
             sourceUrl: json['sourceUrl'] as String?,
             snippet: json['snippet'] as String?,
             imageUrl: _absoluteImageUrl(json['imageUrl'] as String?),
@@ -433,6 +481,8 @@ class ServerSyncService {
     String? seriesName,
     String? maker,
     String? releaseText,
+    int? releaseYear,
+    int? releaseMonth,
     String? sourceUrl,
     String? imageUrl,
   }) async {
@@ -447,6 +497,8 @@ class ServerSyncService {
         'seriesName': seriesName,
         'maker': maker,
         'releaseText': releaseText,
+        'releaseYear': releaseYear,
+        'releaseMonth': releaseMonth,
         'sourceUrl': sourceUrl,
         'imageUrl': imageUrl,
       }),

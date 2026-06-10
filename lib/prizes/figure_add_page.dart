@@ -157,6 +157,13 @@ class _FigureAddPageState extends State<FigureAddPage> {
               labelText: '参照URL',
               border: OutlineInputBorder(),
             ),
+            onSubmitted: (_) => _importFromUrl(),
+          ),
+          const SizedBox(height: 8),
+          OutlinedButton.icon(
+            onPressed: _busy ? null : _importFromUrl,
+            icon: const Icon(Icons.link),
+            label: const Text('URLから自動登録'),
           ),
           const SizedBox(height: 8),
           FilledButton.icon(
@@ -249,9 +256,15 @@ class _FigureAddPageState extends State<FigureAddPage> {
   Future<void> _addFromResult(FigureSearchResult result) async {
     await _create(
       title: result.title,
+      workTitle: result.workTitle ?? result.title,
+      characterName: result.characterName ?? result.title,
+      seriesName: result.seriesName ?? '検索追加',
+      maker: result.maker,
+      releaseText: result.releaseText,
+      releaseYear: result.releaseYear,
+      releaseMonth: result.releaseMonth,
       sourceUrl: result.sourceUrl,
       imageUrl: result.imageUrl,
-      seriesName: '検索追加',
     );
   }
 
@@ -280,8 +293,54 @@ class _FigureAddPageState extends State<FigureAddPage> {
     );
   }
 
+  Future<void> _importFromUrl() async {
+    final url = _sourceUrlController.text.trim().isEmpty
+        ? _queryController.text.trim()
+        : _sourceUrlController.text.trim();
+    final service = widget.serverSyncService;
+    if (service == null || !service.isLoggedIn) {
+      setState(() => _message = 'URLからの自動登録にはサーバーログインが必要です。');
+      return;
+    }
+    if (Uri.tryParse(url)?.hasScheme != true) {
+      setState(() => _message = '参照URLを入力してください。');
+      return;
+    }
+
+    await _run(() async {
+      final figures = await service.fetchFiguresFromUrl(url);
+      if (figures.isEmpty) {
+        return 'URLから登録できるフィギュアが見つかりませんでした。';
+      }
+      for (final figure in figures) {
+        await service.createFigure(
+          title: figure.title,
+          workTitle: figure.workTitle ?? figure.title,
+          characterName: figure.characterName ?? figure.title,
+          seriesName: figure.seriesName ?? 'URL追加',
+          maker: figure.maker ?? '未設定',
+          releaseText: figure.releaseText ?? '未設定',
+          releaseYear: figure.releaseYear,
+          releaseMonth: figure.releaseMonth,
+          sourceUrl: figure.sourceUrl ?? url,
+          imageUrl: figure.imageUrl,
+        );
+      }
+      final count = await service.syncFromServer();
+      _results = figures;
+      _similarResults = const [];
+      return '${figures.length}件をURLから登録し、$count件を同期しました。';
+    });
+  }
+
   Future<void> _create({
     required String title,
+    String? workTitle,
+    String? characterName,
+    String? maker,
+    String? releaseText,
+    int? releaseYear,
+    int? releaseMonth,
     String? sourceUrl,
     String? imageUrl,
     required String seriesName,
@@ -291,11 +350,13 @@ class _FigureAddPageState extends State<FigureAddPage> {
       if (service != null && service.isLoggedIn) {
         await service.createFigure(
           title: title,
-          workTitle: title,
-          characterName: title,
+          workTitle: workTitle ?? title,
+          characterName: characterName ?? title,
           seriesName: seriesName,
-          maker: '未設定',
-          releaseText: '未設定',
+          maker: maker ?? '未設定',
+          releaseText: releaseText ?? '未設定',
+          releaseYear: releaseYear,
+          releaseMonth: releaseMonth,
           sourceUrl: sourceUrl,
           imageUrl: imageUrl,
         );
