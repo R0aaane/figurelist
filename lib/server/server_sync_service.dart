@@ -170,7 +170,7 @@ class ServerSyncService {
     _storeCookie(response);
     final body = jsonDecode(response.body) as Map<String, dynamic>;
     final user = body['user'] as Map<String, dynamic>;
-    username = user['username'] as String;
+    this.username = user['username'] as String;
     isAdmin = user['isAdmin'] == true;
   }
 
