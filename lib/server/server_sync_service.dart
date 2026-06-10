@@ -319,6 +319,10 @@ class ServerSyncService {
     _throwIfFailed(response);
     final prizes = (jsonDecode(response.body) as List<dynamic>)
         .cast<Map<String, dynamic>>();
+    final visiblePrizeIds = <int>{
+      for (final prize in prizes)
+        if (prize['status'] != 'hidden') prize['id'] as int,
+    };
 
     await _database.transaction(() async {
       for (final prize in prizes) {
@@ -330,6 +334,9 @@ class ServerSyncService {
         }
         await _upsertPrizeFromServer(prize);
       }
+      await (_database.delete(
+        _database.prizeItems,
+      )..where((t) => t.id.isNotIn(visiblePrizeIds))).go();
     });
     return prizes.length;
   }

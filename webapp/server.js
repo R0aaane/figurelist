@@ -269,6 +269,7 @@ function migrate() {
   db.exec(`
     CREATE TABLE IF NOT EXISTS prize_items (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
+      ownerUserId INTEGER REFERENCES users(id) ON DELETE CASCADE,
       title TEXT NOT NULL,
       workTitle TEXT NOT NULL,
       characterName TEXT NOT NULL,
@@ -361,6 +362,7 @@ function migrate() {
     );
   `);
   ensureColumn('audit_logs', 'userId', 'INTEGER');
+  ensureColumn('prize_items', 'ownerUserId', 'INTEGER REFERENCES users(id) ON DELETE CASCADE');
 }
 
 function now() {
@@ -608,8 +610,10 @@ function getPrizeForUser(userId, prizeId) {
       COALESCE(s.updatedAtEpochMs, p.updatedAtEpochMs) AS updatedAtEpochMs
     FROM prize_items p
     LEFT JOIN user_prize_states s ON s.prizeId = p.id AND s.userId = ?
-    WHERE p.id = ? AND (s.status IS NULL OR s.status <> 'hidden')
-  `).get(userId, prizeId) || null;
+    WHERE p.id = ?
+      AND (p.ownerUserId IS NULL OR p.ownerUserId = ?)
+      AND (s.status IS NULL OR s.status <> 'hidden')
+  `).get(userId, prizeId, userId) || null;
 }
 
 function normalizePrize(row) {
@@ -698,8 +702,8 @@ async function handleApi(req, res, url) {
 
   if (method === 'GET' && segments[0] === 'prizes' && segments.length === 1) {
     const includeHidden = url.searchParams.get('includeHidden') === '1';
-    const where = [];
-    const params = [];
+    const where = ['(p.ownerUserId IS NULL OR p.ownerUserId = ?)'];
+    const params = [user.id];
     if (!includeHidden) {
       where.push('(s.status IS NULL OR s.status <> ?)');
       params.push('hidden');
@@ -765,11 +769,12 @@ async function handleApi(req, res, url) {
     const createdAt = now();
     const result = db.prepare(`
       INSERT INTO prize_items (
-        title, workTitle, characterName, seriesName, maker, releaseText,
+        ownerUserId, title, workTitle, characterName, seriesName, maker, releaseText,
         releaseYear, releaseMonth, sourceUrl, imageUrl, createdAtEpochMs, updatedAtEpochMs
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
+      user.id,
       title,
       blank(body.workTitle) || title,
       blank(body.characterName) || title,
@@ -792,7 +797,7 @@ async function handleApi(req, res, url) {
     const id = Number(segments[1]);
     const body = await readJson(req);
     if (!statuses.has(body.status)) return sendError(res, 400, 'Unknown status');
-    if (!getRow('prize_items', id)) return sendError(res, 404, 'Prize not found');
+    if (!getPrizeForUser(user.id, id)) return sendError(res, 404, 'Prize not found');
     const before = getUserState(user.id, id);
     const acquired = body.status === 'owned' ? now() : null;
     const updatedAt = now();
@@ -812,7 +817,7 @@ async function handleApi(req, res, url) {
   if (method === 'PATCH' && segments[0] === 'prizes' && segments[2] === 'memo') {
     const id = Number(segments[1]);
     const body = await readJson(req);
-    if (!getRow('prize_items', id)) return sendError(res, 404, 'Prize not found');
+    if (!getPrizeForUser(user.id, id)) return sendError(res, 404, 'Prize not found');
     const before = getUserState(user.id, id);
     const memo = typeof body.memo === 'string' && body.memo.trim() ? body.memo.trim() : null;
     const existing = getUserState(user.id, id);
@@ -833,7 +838,9 @@ async function handleApi(req, res, url) {
     const id = Number(segments[1]);
     const body = await readJson(req);
     const before = getRow('prize_items', id);
-    if (!before) return sendError(res, 404, 'Prize not found');
+    if (!before || (before.ownerUserId != null && before.ownerUserId !== user.id)) {
+      return sendError(res, 404, 'Prize not found');
+    }
     const imageUrl = blank(body.imageUrl);
     db.prepare('UPDATE prize_items SET imageUrl = ?, updatedAtEpochMs = ? WHERE id = ?').run(imageUrl, now(), id);
     const after = getRow('prize_items', id);
@@ -844,7 +851,9 @@ async function handleApi(req, res, url) {
   if (method === 'POST' && segments[0] === 'prizes' && segments[2] === 'box-image') {
     const id = Number(segments[1]);
     const before = getRow('prize_items', id);
-    if (!before) return sendError(res, 404, 'Prize not found');
+    if (!before || (before.ownerUserId != null && before.ownerUserId !== user.id)) {
+      return sendError(res, 404, 'Prize not found');
+    }
     const body = await readJson(req);
     const dataUrl = typeof body.dataUrl === 'string' ? body.dataUrl : '';
     const match = dataUrl.match(/^data:(image\/(?:png|jpeg|webp|gif));base64,([A-Za-z0-9+/=]+)$/);
@@ -872,7 +881,7 @@ async function handleApi(req, res, url) {
 
   if (method === 'POST' && segments[0] === 'prizes' && segments[2] === 'logs') {
     const prizeId = Number(segments[1]);
-    if (!getRow('prize_items', prizeId)) return sendError(res, 404, 'Prize not found');
+    if (!getPrizeForUser(user.id, prizeId)) return sendError(res, 404, 'Prize not found');
     const body = await readJson(req);
     const result = db.prepare(`
       INSERT INTO user_acquisition_logs (userId, prizeId, method, place, costYen, memo, createdAtEpochMs)
@@ -885,7 +894,7 @@ async function handleApi(req, res, url) {
 
   if (method === 'DELETE' && segments[0] === 'prizes' && segments.length === 2) {
     const id = Number(segments[1]);
-    if (!getRow('prize_items', id)) return sendError(res, 404, 'Prize not found');
+    if (!getPrizeForUser(user.id, id)) return sendError(res, 404, 'Prize not found');
     const before = getUserState(user.id, id);
     const updatedAt = now();
     db.prepare(`
