@@ -652,6 +652,11 @@ class _MainProjectsPane extends StatelessWidget {
               characterQuery: characterController.text,
               seriesQuery: seriesController.text,
               registeredStoreId: selectedStoreId,
+              groupByCharacter:
+                  selectedStatus == null &&
+                  selectedStoreId == null &&
+                  characterController.text.trim().isEmpty &&
+                  seriesController.text.trim().isEmpty,
             ),
             builder: (context, snapshot) {
               final prizes = snapshot.data ?? const [];
@@ -694,6 +699,11 @@ class _MainProjectsPane extends StatelessWidget {
                           gridView: gridView,
                           imageOnlyView: imageOnlyView,
                           density: density,
+                          groupByCharacter:
+                              selectedStatus == null &&
+                              selectedStoreId == null &&
+                              characterController.text.trim().isEmpty &&
+                              seriesController.text.trim().isEmpty,
                           onOpenPrize: onOpenPrize,
                           onStatusSelected: onStatusSelected,
                           onDeleteSelected: onDeleteSelected,
@@ -1038,6 +1048,7 @@ class _PrizeCollectionView extends StatelessWidget {
     required this.gridView,
     required this.imageOnlyView,
     required this.density,
+    required this.groupByCharacter,
     required this.onOpenPrize,
     required this.onStatusSelected,
     required this.onDeleteSelected,
@@ -1049,6 +1060,7 @@ class _PrizeCollectionView extends StatelessWidget {
   final bool gridView;
   final bool imageOnlyView;
   final _PrizeListDensity density;
+  final bool groupByCharacter;
   final ValueChanged<PrizeItem> onOpenPrize;
   final void Function(PrizeItem prize, String status) onStatusSelected;
   final ValueChanged<PrizeItem> onDeleteSelected;
@@ -1074,31 +1086,52 @@ class _PrizeCollectionView extends StatelessWidget {
               : width >= 520
               ? 4
               : 3;
-          return GridView.builder(
-            padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: columns,
-              crossAxisSpacing: 12,
-              mainAxisSpacing: 12,
+          return CustomScrollView(
+            slivers: _imageOnlySlivers(
+              prizes: prizes,
+              columns: columns,
+              groupByCharacter: groupByCharacter,
+              onOpenPrize: onOpenPrize,
+              onStatusSelected: onStatusSelected,
+              onDeleteSelected: onDeleteSelected,
             ),
-            itemCount: prizes.length,
-            itemBuilder: (context, index) {
-              final prize = prizes[index];
-              return _PrizeImageOnlyTile(
-                prize: prize,
-                onTap: () => onOpenPrize(prize),
-                onStatusSelected: (status) => onStatusSelected(prize, status),
-                onDeleteSelected: () => onDeleteSelected(prize),
-              );
-            },
           );
         },
       );
     }
     if (!gridView) {
+      final sections = _characterSections(prizes);
+      final rowCount = groupByCharacter
+          ? sections.fold<int>(
+              0,
+              (total, section) => total + 1 + section.prizes.length,
+            )
+          : prizes.length;
       return ListView.separated(
         padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
         itemBuilder: (context, index) {
+          if (groupByCharacter) {
+            var offset = 0;
+            for (final section in sections) {
+              if (index == offset) {
+                return _CharacterSectionHeader(section: section);
+              }
+              final localIndex = index - offset - 1;
+              if (localIndex >= 0 && localIndex < section.prizes.length) {
+                final prize = section.prizes[localIndex];
+                return _PrizeTile(
+                  prize: prize,
+                  appearance: appearancesByPrizeId[prize.id],
+                  density: density,
+                  asGridCard: false,
+                  onTap: () => onOpenPrize(prize),
+                  onStatusSelected: (status) => onStatusSelected(prize, status),
+                  onDeleteSelected: () => onDeleteSelected(prize),
+                );
+              }
+              offset += 1 + section.prizes.length;
+            }
+          }
           final prize = prizes[index];
           return _PrizeTile(
             prize: prize,
@@ -1111,7 +1144,7 @@ class _PrizeCollectionView extends StatelessWidget {
           );
         },
         separatorBuilder: (_, _) => const SizedBox(height: 10),
-        itemCount: prizes.length,
+        itemCount: rowCount,
       );
     }
     return LayoutBuilder(
@@ -1122,30 +1155,111 @@ class _PrizeCollectionView extends StatelessWidget {
             : width >= 760
             ? 2
             : 1;
-        return GridView.builder(
-          padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: columns,
-            crossAxisSpacing: 28,
-            mainAxisSpacing: 18,
-            childAspectRatio: density == _PrizeListDensity.large ? 2.45 : 3.8,
+        return CustomScrollView(
+          slivers: _gridSlivers(
+            prizes: prizes,
+            appearancesByPrizeId: appearancesByPrizeId,
+            columns: columns,
+            density: density,
+            groupByCharacter: groupByCharacter,
+            onOpenPrize: onOpenPrize,
+            onStatusSelected: onStatusSelected,
+            onDeleteSelected: onDeleteSelected,
           ),
-          itemCount: prizes.length,
-          itemBuilder: (context, index) {
-            final prize = prizes[index];
-            return _PrizeTile(
-              prize: prize,
-              appearance: appearancesByPrizeId[prize.id],
-              density: density,
-              asGridCard: true,
-              onTap: () => onOpenPrize(prize),
-              onStatusSelected: (status) => onStatusSelected(prize, status),
-              onDeleteSelected: () => onDeleteSelected(prize),
-            );
-          },
         );
       },
     );
+  }
+
+  List<SliverToBoxAdapter> _sectionHeaderSliver(_CharacterSection section) {
+    return [
+      SliverToBoxAdapter(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 10, 20, 10),
+          child: _CharacterSectionHeader(section: section),
+        ),
+      ),
+    ];
+  }
+
+  List<Widget> _gridSlivers({
+    required List<PrizeItem> prizes,
+    required Map<int, PrizeStoreAppearanceEntry> appearancesByPrizeId,
+    required int columns,
+    required _PrizeListDensity density,
+    required bool groupByCharacter,
+    required ValueChanged<PrizeItem> onOpenPrize,
+    required void Function(PrizeItem prize, String status) onStatusSelected,
+    required ValueChanged<PrizeItem> onDeleteSelected,
+  }) {
+    final sections = groupByCharacter
+        ? _characterSections(prizes)
+        : [_CharacterSection(name: '', prizes: prizes)];
+    return [
+      for (final section in sections) ...[
+        if (groupByCharacter) ..._sectionHeaderSliver(section),
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+          sliver: SliverGrid(
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: columns,
+              crossAxisSpacing: 28,
+              mainAxisSpacing: 18,
+              childAspectRatio: density == _PrizeListDensity.large ? 2.45 : 3.8,
+            ),
+            delegate: SliverChildBuilderDelegate((context, index) {
+              final prize = section.prizes[index];
+              return _PrizeTile(
+                prize: prize,
+                appearance: appearancesByPrizeId[prize.id],
+                density: density,
+                asGridCard: true,
+                onTap: () => onOpenPrize(prize),
+                onStatusSelected: (status) => onStatusSelected(prize, status),
+                onDeleteSelected: () => onDeleteSelected(prize),
+              );
+            }, childCount: section.prizes.length),
+          ),
+        ),
+      ],
+    ];
+  }
+
+  List<Widget> _imageOnlySlivers({
+    required List<PrizeItem> prizes,
+    required int columns,
+    required bool groupByCharacter,
+    required ValueChanged<PrizeItem> onOpenPrize,
+    required void Function(PrizeItem prize, String status) onStatusSelected,
+    required ValueChanged<PrizeItem> onDeleteSelected,
+  }) {
+    final sections = groupByCharacter
+        ? _characterSections(prizes)
+        : [_CharacterSection(name: '', prizes: prizes)];
+    return [
+      for (final section in sections) ...[
+        if (groupByCharacter) ..._sectionHeaderSliver(section),
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+          sliver: SliverGrid(
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: columns,
+              crossAxisSpacing: 12,
+              mainAxisSpacing: 12,
+            ),
+            delegate: SliverChildBuilderDelegate((context, index) {
+              final prize = section.prizes[index];
+              return _PrizeImageOnlyTile(
+                prize: prize,
+                onTap: () => onOpenPrize(prize),
+                onStatusSelected: (status) => onStatusSelected(prize, status),
+                onDeleteSelected: () => onDeleteSelected(prize),
+              );
+            }, childCount: section.prizes.length),
+          ),
+        ),
+      ],
+    ];
   }
 }
 
@@ -1264,6 +1378,70 @@ class _SuggestionTextFilterState extends State<_SuggestionTextFilter> {
           },
         );
       },
+    );
+  }
+}
+
+class _CharacterSection {
+  const _CharacterSection({required this.name, required this.prizes});
+
+  final String name;
+  final List<PrizeItem> prizes;
+}
+
+List<_CharacterSection> _characterSections(List<PrizeItem> prizes) {
+  final sections = <_CharacterSection>[];
+  var currentName = '';
+  var currentPrizes = <PrizeItem>[];
+
+  void flush() {
+    if (currentPrizes.isEmpty) return;
+    sections.add(
+      _CharacterSection(name: currentName, prizes: List.of(currentPrizes)),
+    );
+    currentPrizes = <PrizeItem>[];
+  }
+
+  for (final prize in prizes) {
+    final name = prize.characterName.trim().isEmpty
+        ? 'キャラクター未設定'
+        : prize.characterName.trim();
+    if (currentPrizes.isNotEmpty && name != currentName) {
+      flush();
+    }
+    currentName = name;
+    currentPrizes.add(prize);
+  }
+  flush();
+  return sections;
+}
+
+class _CharacterSectionHeader extends StatelessWidget {
+  const _CharacterSectionHeader({required this.section});
+
+  final _CharacterSection section;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 34,
+      alignment: Alignment.centerLeft,
+      padding: const EdgeInsets.symmetric(horizontal: 10),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF5F5F6),
+        border: Border.all(color: const Color(0xFFE2E2E5)),
+        borderRadius: BorderRadius.circular(7),
+      ),
+      child: Text(
+        '${section.name}  ${section.prizes.length}',
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: const TextStyle(
+          color: Color(0xFF151518),
+          fontSize: 13,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
     );
   }
 }

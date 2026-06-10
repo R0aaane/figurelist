@@ -21,6 +21,7 @@ class PrizeRepository {
     String? characterQuery,
     String? seriesQuery,
     int? registeredStoreId,
+    bool groupByCharacter = false,
   }) {
     final query = _database.select(_database.prizeItems);
 
@@ -44,20 +45,42 @@ class PrizeRepository {
       );
       query.where((t) => t.id.isInQuery(appearanceSubquery));
     }
-    query.orderBy([
-      (t) => OrderingTerm(
-        expression: t.releaseYear,
-        mode: OrderingMode.desc,
-        nulls: NullsOrder.last,
-      ),
-      (t) => OrderingTerm(
-        expression: t.releaseMonth,
-        mode: OrderingMode.desc,
-        nulls: NullsOrder.last,
-      ),
-      (t) =>
-          OrderingTerm(expression: t.updatedAtEpochMs, mode: OrderingMode.desc),
-    ]);
+    if (groupByCharacter) {
+      query.orderBy([
+        (t) => OrderingTerm(expression: t.characterName),
+        (t) => OrderingTerm(
+          expression: t.releaseYear,
+          mode: OrderingMode.desc,
+          nulls: NullsOrder.last,
+        ),
+        (t) => OrderingTerm(
+          expression: t.releaseMonth,
+          mode: OrderingMode.desc,
+          nulls: NullsOrder.last,
+        ),
+        (t) => OrderingTerm(
+          expression: t.updatedAtEpochMs,
+          mode: OrderingMode.desc,
+        ),
+      ]);
+    } else {
+      query.orderBy([
+        (t) => OrderingTerm(
+          expression: t.releaseYear,
+          mode: OrderingMode.desc,
+          nulls: NullsOrder.last,
+        ),
+        (t) => OrderingTerm(
+          expression: t.releaseMonth,
+          mode: OrderingMode.desc,
+          nulls: NullsOrder.last,
+        ),
+        (t) => OrderingTerm(
+          expression: t.updatedAtEpochMs,
+          mode: OrderingMode.desc,
+        ),
+      ]);
+    }
 
     return query.watch();
   }
