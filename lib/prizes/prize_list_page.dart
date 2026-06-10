@@ -35,6 +35,7 @@ class _PrizeListPageState extends State<PrizeListPage> {
   int? _storeFilterId;
   _PrizeListDensity _density = _PrizeListDensity.large;
   bool _gridView = true;
+  bool _imageOnlyView = false;
 
   @override
   void initState() {
@@ -109,6 +110,7 @@ class _PrizeListPageState extends State<PrizeListPage> {
                         seriesController: _seriesController,
                         density: _density,
                         gridView: _gridView,
+                        imageOnlyView: _imageOnlyView,
                         showInlineFilters: !showSidebar,
                         onStatusChanged: (value) =>
                             setState(() => _statusFilter = value),
@@ -118,8 +120,13 @@ class _PrizeListPageState extends State<PrizeListPage> {
                         onSync: _syncSamples,
                         onStores: _openStorePage,
                         onAccount: _openAccountPage,
-                        onToggleGridView: () =>
-                            setState(() => _gridView = !_gridView),
+                        onToggleGridView: () => setState(() {
+                          _imageOnlyView = false;
+                          _gridView = !_gridView;
+                        }),
+                        onToggleImageOnlyView: () => setState(() {
+                          _imageOnlyView = !_imageOnlyView;
+                        }),
                         onToggleDensity: () {
                           setState(() {
                             _density = _density == _PrizeListDensity.compact
@@ -595,6 +602,7 @@ class _MainProjectsPane extends StatelessWidget {
     required this.seriesController,
     required this.density,
     required this.gridView,
+    required this.imageOnlyView,
     required this.showInlineFilters,
     required this.onStatusChanged,
     required this.onStoreChanged,
@@ -603,6 +611,7 @@ class _MainProjectsPane extends StatelessWidget {
     required this.onStores,
     required this.onAccount,
     required this.onToggleGridView,
+    required this.onToggleImageOnlyView,
     required this.onToggleDensity,
     required this.onOpenPrize,
     required this.onStatusSelected,
@@ -616,6 +625,7 @@ class _MainProjectsPane extends StatelessWidget {
   final TextEditingController seriesController;
   final _PrizeListDensity density;
   final bool gridView;
+  final bool imageOnlyView;
   final bool showInlineFilters;
   final ValueChanged<String?> onStatusChanged;
   final ValueChanged<int?> onStoreChanged;
@@ -624,6 +634,7 @@ class _MainProjectsPane extends StatelessWidget {
   final VoidCallback onStores;
   final VoidCallback onAccount;
   final VoidCallback onToggleGridView;
+  final VoidCallback onToggleImageOnlyView;
   final VoidCallback onToggleDensity;
   final ValueChanged<PrizeItem> onOpenPrize;
   final void Function(PrizeItem prize, String status) onStatusSelected;
@@ -664,9 +675,11 @@ class _MainProjectsPane extends StatelessWidget {
                         selectedStoreId: selectedStoreId,
                         showInlineFilters: showInlineFilters,
                         gridView: gridView,
+                        imageOnlyView: imageOnlyView,
                         onStatusChanged: onStatusChanged,
                         onStoreChanged: onStoreChanged,
                         onToggleGridView: onToggleGridView,
+                        onToggleImageOnlyView: onToggleImageOnlyView,
                         onToggleDensity: onToggleDensity,
                         onSync: onSync,
                       ),
@@ -679,6 +692,7 @@ class _MainProjectsPane extends StatelessWidget {
                               !snapshot.hasData,
                           appearancesByPrizeId: appearancesByPrizeId,
                           gridView: gridView,
+                          imageOnlyView: imageOnlyView,
                           density: density,
                           onOpenPrize: onOpenPrize,
                           onStatusSelected: onStatusSelected,
@@ -827,9 +841,11 @@ class _ProjectToolbar extends StatelessWidget {
     required this.selectedStoreId,
     required this.showInlineFilters,
     required this.gridView,
+    required this.imageOnlyView,
     required this.onStatusChanged,
     required this.onStoreChanged,
     required this.onToggleGridView,
+    required this.onToggleImageOnlyView,
     required this.onToggleDensity,
     required this.onSync,
   });
@@ -841,9 +857,11 @@ class _ProjectToolbar extends StatelessWidget {
   final int? selectedStoreId;
   final bool showInlineFilters;
   final bool gridView;
+  final bool imageOnlyView;
   final ValueChanged<String?> onStatusChanged;
   final ValueChanged<int?> onStoreChanged;
   final VoidCallback onToggleGridView;
+  final VoidCallback onToggleImageOnlyView;
   final VoidCallback onToggleDensity;
   final Future<void> Function() onSync;
 
@@ -878,6 +896,13 @@ class _ProjectToolbar extends StatelessWidget {
                 icon: gridView ? Icons.view_list : Icons.grid_view_outlined,
                 tooltip: gridView ? 'リスト表示' : 'グリッド表示',
                 onPressed: onToggleGridView,
+              ),
+              const SizedBox(width: 8),
+              _SmallSquareButton(
+                icon: Icons.photo_library_outlined,
+                tooltip: '画像だけ表示',
+                selected: imageOnlyView,
+                onPressed: onToggleImageOnlyView,
               ),
               const SizedBox(width: 8),
               _SmallSquareButton(
@@ -1011,6 +1036,7 @@ class _PrizeCollectionView extends StatelessWidget {
     required this.isLoading,
     required this.appearancesByPrizeId,
     required this.gridView,
+    required this.imageOnlyView,
     required this.density,
     required this.onOpenPrize,
     required this.onStatusSelected,
@@ -1021,6 +1047,7 @@ class _PrizeCollectionView extends StatelessWidget {
   final bool isLoading;
   final Map<int, PrizeStoreAppearanceEntry> appearancesByPrizeId;
   final bool gridView;
+  final bool imageOnlyView;
   final _PrizeListDensity density;
   final ValueChanged<PrizeItem> onOpenPrize;
   final void Function(PrizeItem prize, String status) onStatusSelected;
@@ -1033,6 +1060,40 @@ class _PrizeCollectionView extends StatelessWidget {
     }
     if (prizes.isEmpty) {
       return const Center(child: Text('該当するプライズはありません'));
+    }
+    if (imageOnlyView) {
+      return LayoutBuilder(
+        builder: (context, constraints) {
+          final width = constraints.maxWidth;
+          final columns = width >= 1320
+              ? 7
+              : width >= 980
+              ? 6
+              : width >= 760
+              ? 5
+              : width >= 520
+              ? 4
+              : 3;
+          return GridView.builder(
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: columns,
+              crossAxisSpacing: 12,
+              mainAxisSpacing: 12,
+            ),
+            itemCount: prizes.length,
+            itemBuilder: (context, index) {
+              final prize = prizes[index];
+              return _PrizeImageOnlyTile(
+                prize: prize,
+                onTap: () => onOpenPrize(prize),
+                onStatusSelected: (status) => onStatusSelected(prize, status),
+                onDeleteSelected: () => onDeleteSelected(prize),
+              );
+            },
+          );
+        },
+      );
     }
     if (!gridView) {
       return ListView.separated(
@@ -1233,11 +1294,13 @@ class _SmallSquareButton extends StatelessWidget {
     required this.icon,
     required this.onPressed,
     this.tooltip,
+    this.selected = false,
   });
 
   final IconData icon;
   final VoidCallback onPressed;
   final String? tooltip;
+  final bool selected;
 
   @override
   Widget build(BuildContext context) {
@@ -1247,7 +1310,7 @@ class _SmallSquareButton extends StatelessWidget {
         onPressed: onPressed,
         style: IconButton.styleFrom(
           fixedSize: const Size(43, 43),
-          backgroundColor: Colors.white,
+          backgroundColor: selected ? const Color(0xFFECECEF) : Colors.white,
           foregroundColor: const Color(0xFF151518),
           side: const BorderSide(color: Color(0xFFE0E0E3)),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(7)),
@@ -1386,6 +1449,84 @@ class _PrizeTile extends StatelessWidget {
 
   Future<void> _showContextMenu(BuildContext context, Offset position) async {
     final overlay = Overlay.of(context).context.findRenderObject() as RenderBox;
+    final selected = await showMenu<_PrizeAction>(
+      context: context,
+      position: RelativeRect.fromRect(
+        Rect.fromLTWH(position.dx, position.dy, 1, 1),
+        Offset.zero & overlay.size,
+      ),
+      items: [
+        ..._statusMenuItems(prize.status),
+        const PopupMenuDivider(),
+        const PopupMenuItem(
+          value: _PrizeAction.delete,
+          child: ListTile(
+            leading: Icon(Icons.delete_outline),
+            title: Text('削除'),
+          ),
+        ),
+      ],
+    );
+
+    switch (selected) {
+      case _PrizeAction.markOwned:
+        onStatusSelected(PrizeStatus.owned);
+      case _PrizeAction.markUnowned:
+        onStatusSelected(PrizeStatus.unowned);
+      case _PrizeAction.markUpcoming:
+        onStatusSelected(PrizeStatus.upcoming);
+      case _PrizeAction.markReserved:
+        onStatusSelected(PrizeStatus.reserved);
+      case _PrizeAction.markSkipped:
+        onStatusSelected(PrizeStatus.skipped);
+      case _PrizeAction.delete:
+        onDeleteSelected();
+      case null:
+        break;
+    }
+  }
+}
+
+class _PrizeImageOnlyTile extends StatelessWidget {
+  const _PrizeImageOnlyTile({
+    required this.prize,
+    required this.onTap,
+    required this.onStatusSelected,
+    required this.onDeleteSelected,
+  });
+
+  final PrizeItem prize;
+  final VoidCallback onTap;
+  final ValueChanged<String> onStatusSelected;
+  final VoidCallback onDeleteSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: prize.title,
+      child: GestureDetector(
+        onSecondaryTapDown: (details) =>
+            _showContextMenu(context, details.globalPosition),
+        onLongPressStart: (details) =>
+            _showContextMenu(context, details.globalPosition),
+        child: Card(
+          margin: EdgeInsets.zero,
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: onTap,
+            child: _PrizeImage(url: prize.imageUrl, size: double.infinity),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showContextMenu(BuildContext context, Offset position) async {
+    final overlay =
+        Navigator.of(context).overlay?.context.findRenderObject() as RenderBox?;
+    if (overlay == null) {
+      return;
+    }
     final selected = await showMenu<_PrizeAction>(
       context: context,
       position: RelativeRect.fromRect(
