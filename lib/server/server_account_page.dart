@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'server_sync_service.dart';
 
@@ -17,6 +18,7 @@ class _ServerAccountPageState extends State<ServerAccountPage> {
   final _passwordController = TextEditingController();
   bool _busy = false;
   String? _message;
+  String? _cloudflareUrl;
 
   @override
   void initState() {
@@ -108,6 +110,25 @@ class _ServerAccountPageState extends State<ServerAccountPage> {
             const SizedBox(height: 12),
             Text(_message!),
           ],
+          if (_cloudflareUrl != null) ...[
+            const SizedBox(height: 12),
+            InputDecorator(
+              decoration: const InputDecoration(
+                labelText: 'Cloudflare公開URL',
+                border: OutlineInputBorder(),
+              ),
+              child: Row(
+                children: [
+                  Expanded(child: SelectableText(_cloudflareUrl!)),
+                  IconButton(
+                    tooltip: 'URLを開く',
+                    onPressed: _busy ? null : _openCloudflareUrl,
+                    icon: const Icon(Icons.open_in_new),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -149,16 +170,24 @@ class _ServerAccountPageState extends State<ServerAccountPage> {
 
   Future<void> _startCloudflare() async {
     await _run(() async {
-      await widget.service.startCloudflareTunnel();
-      return 'Cloudflare Tunnelを起動しました。';
+      final url = await widget.service.startCloudflareTunnel();
+      if (mounted) setState(() => _cloudflareUrl = url);
+      return 'Cloudflare Tunnelを起動しました。\n$url';
     });
   }
 
   Future<void> _stopCloudflare() async {
     await _run(() async {
       await widget.service.stopCloudflareTunnel();
+      if (mounted) setState(() => _cloudflareUrl = null);
       return 'Cloudflare Tunnelを停止しました。';
     });
+  }
+
+  Future<void> _openCloudflareUrl() async {
+    final url = _cloudflareUrl;
+    if (url == null) return;
+    await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
   }
 
   Future<void> _run(Future<String> Function() action) async {
