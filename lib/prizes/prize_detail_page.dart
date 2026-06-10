@@ -172,6 +172,10 @@ class _PrizeDetailPageState extends State<PrizeDetailPage> {
                     child: Text('\u672a\u7372\u5f97'),
                   ),
                   DropdownMenuItem(
+                    value: PrizeStatus.upcoming,
+                    child: Text('\u4eca\u5f8c\u767b\u5834'),
+                  ),
+                  DropdownMenuItem(
                     value: PrizeStatus.owned,
                     child: Text('\u7372\u5f97\u6e08\u307f'),
                   ),

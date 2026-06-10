@@ -474,6 +474,34 @@ class ServerSyncService {
         .toList(growable: false);
   }
 
+  Future<List<FigureSearchResult>> importFiguresFromUrl(String url) async {
+    _requireLogin();
+    final response = await _client.post(
+      _appUri('/api/figure-url/import'),
+      headers: _headers,
+      body: jsonEncode({'url': url}),
+    );
+    _throwIfFailed(response);
+    return (jsonDecode(response.body) as List<dynamic>)
+        .cast<Map<String, dynamic>>()
+        .map(
+          (json) => FigureSearchResult(
+            title: json['title'] as String,
+            workTitle: json['workTitle'] as String?,
+            characterName: json['characterName'] as String?,
+            seriesName: json['seriesName'] as String?,
+            maker: json['maker'] as String?,
+            releaseText: json['releaseText'] as String?,
+            releaseYear: json['releaseYear'] as int?,
+            releaseMonth: json['releaseMonth'] as int?,
+            sourceUrl: json['sourceUrl'] as String?,
+            snippet: json['snippet'] as String?,
+            imageUrl: _absoluteImageUrl(json['imageUrl'] as String?),
+          ),
+        )
+        .toList(growable: false);
+  }
+
   Future<int> createFigure({
     required String title,
     String? workTitle,

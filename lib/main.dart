@@ -35,6 +35,7 @@ class _MyAppState extends State<MyApp> {
     _database = AppDatabase();
     _repository = PrizeRepository(_database);
     _serverSyncService = ServerSyncService(_database);
+    unawaited(_repository.refreshUpcomingStatuses());
     unawaited(_restoreServerSession());
   }
 

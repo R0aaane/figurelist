@@ -6,14 +6,16 @@ part 'app_database.g.dart';
 
 class PrizeStatus {
   static const unowned = 'unowned';
+  static const upcoming = 'upcoming';
   static const owned = 'owned';
   static const reserved = 'reserved';
   static const skipped = 'skipped';
 
-  static const values = [unowned, owned, reserved, skipped];
+  static const values = [unowned, upcoming, owned, reserved, skipped];
 
   static String label(String status) {
     return switch (status) {
+      upcoming => '\u4eca\u5f8c\u767b\u5834',
       owned => '\u7372\u5f97\u6e08\u307f',
       reserved => '\u7372\u5f97\u4e88\u5b9a',
       skipped => '\u898b\u9001\u308a',

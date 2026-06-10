@@ -62,6 +62,25 @@ class PrizeRepository {
     return query.watch();
   }
 
+  Future<void> refreshUpcomingStatuses({DateTime? today}) async {
+    final current = today ?? DateTime.now();
+    final now = current.millisecondsSinceEpoch;
+    await (_database.update(_database.prizeItems)..where((t) {
+          final olderYear = t.releaseYear.isSmallerThanValue(current.year);
+          final olderMonth =
+              t.releaseYear.equals(current.year) &
+              t.releaseMonth.isSmallerThanValue(current.month);
+          return t.status.equals(PrizeStatus.upcoming) &
+              (olderYear | olderMonth);
+        }))
+        .write(
+          PrizeItemsCompanion(
+            status: const Value(PrizeStatus.unowned),
+            updatedAtEpochMs: Value(now),
+          ),
+        );
+  }
+
   Stream<List<String>> watchCharacterNames() {
     final query = _database.selectOnly(_database.prizeItems, distinct: true)
       ..addColumns([_database.prizeItems.characterName])

@@ -19,7 +19,7 @@ const db = new DatabaseSync(dbPath);
 db.exec('PRAGMA foreign_keys = ON');
 db.exec('PRAGMA journal_mode = WAL');
 
-const statuses = new Set(['unowned', 'owned', 'reserved', 'skipped', 'hidden']);
+const statuses = new Set(['unowned', 'upcoming', 'owned', 'reserved', 'skipped', 'hidden']);
 
 const samplePrizes = [
   {
@@ -360,6 +360,13 @@ function migrate() {
       memo TEXT,
       createdAtEpochMs INTEGER NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS user_figure_import_sources (
+      userId INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      sourceUrl TEXT NOT NULL,
+      createdAtEpochMs INTEGER NOT NULL,
+      lastSyncedAtEpochMs INTEGER,
+      PRIMARY KEY (userId, sourceUrl)
+    );
   `);
   ensureColumn('audit_logs', 'userId', 'INTEGER');
   ensureColumn('prize_items', 'ownerUserId', 'INTEGER REFERENCES users(id) ON DELETE CASCADE');
@@ -620,6 +627,167 @@ function normalizePrize(row) {
   return row ? { ...row, isRegistered: undefined } : null;
 }
 
+function isFutureRelease(releaseYear, releaseMonth) {
+  if (!Number.isInteger(releaseYear)) return false;
+  const today = new Date();
+  const currentYear = today.getFullYear();
+  const currentMonth = today.getMonth() + 1;
+  if (!Number.isInteger(releaseMonth)) {
+    return releaseYear > currentYear;
+  }
+  return releaseYear > currentYear
+    || (releaseYear === currentYear && releaseMonth >= currentMonth);
+}
+
+function refreshUpcomingStatuses() {
+  const today = new Date();
+  const currentYear = today.getFullYear();
+  const currentMonth = today.getMonth() + 1;
+  const updatedAt = now();
+  db.prepare(`
+    UPDATE prize_items
+    SET status = 'unowned', updatedAtEpochMs = ?
+    WHERE status = 'upcoming'
+      AND releaseYear IS NOT NULL
+      AND (
+        releaseYear < ?
+        OR (releaseMonth IS NOT NULL AND releaseYear = ? AND releaseMonth < ?)
+      )
+  `).run(updatedAt, currentYear, currentYear, currentMonth);
+  db.prepare(`
+    UPDATE user_prize_states
+    SET status = 'unowned', updatedAtEpochMs = ?
+    WHERE status = 'upcoming'
+      AND prizeId IN (
+        SELECT id
+        FROM prize_items
+        WHERE releaseYear IS NOT NULL
+          AND (
+            releaseYear < ?
+            OR (releaseMonth IS NOT NULL AND releaseYear = ? AND releaseMonth < ?)
+          )
+      )
+  `).run(updatedAt, currentYear, currentYear, currentMonth);
+}
+
+function upsertUserFigure(userId, figure) {
+  const title = blank(figure.title);
+  if (!title) return null;
+  const sourceUrl = blank(figure.sourceUrl);
+  const createdAt = now();
+  const existing = sourceUrl
+    ? db.prepare('SELECT * FROM prize_items WHERE ownerUserId = ? AND sourceUrl = ?').get(userId, sourceUrl)
+    : null;
+  const workTitle = blank(figure.workTitle) || title;
+  const characterName = blank(figure.characterName) || title;
+  const seriesName = blank(figure.seriesName) || existing?.seriesName || 'URL追加';
+  const maker = blank(figure.maker) || existing?.maker || '未設定';
+  const releaseText = blank(figure.releaseText) || existing?.releaseText || '未設定';
+  const releaseYear = Number.isInteger(figure.releaseYear) ? figure.releaseYear : existing?.releaseYear ?? null;
+  const releaseMonth = Number.isInteger(figure.releaseMonth) ? figure.releaseMonth : existing?.releaseMonth ?? null;
+  const imageUrl = blank(figure.imageUrl);
+  const defaultStatus = isFutureRelease(releaseYear, releaseMonth)
+    ? 'upcoming'
+    : 'unowned';
+
+  if (existing) {
+    const before = { ...existing };
+    db.prepare(`
+      UPDATE prize_items SET
+        title = ?, workTitle = ?, characterName = ?, seriesName = ?, maker = ?,
+        releaseText = ?, releaseYear = ?, releaseMonth = ?, imageUrl = COALESCE(?, imageUrl),
+        status = CASE WHEN status = 'upcoming' THEN ? ELSE status END,
+        updatedAtEpochMs = ?
+      WHERE id = ?
+    `).run(
+      title,
+      workTitle,
+      characterName,
+      seriesName,
+      maker,
+      releaseText,
+      releaseYear,
+      releaseMonth,
+      imageUrl,
+      defaultStatus,
+      createdAt,
+      existing.id
+    );
+    const after = getRow('prize_items', existing.id);
+    recordAudit('prize_items', existing.id, 'manual_update', before, after, userId);
+    return getPrizeForUser(userId, existing.id);
+  }
+
+  const result = db.prepare(`
+    INSERT INTO prize_items (
+      ownerUserId, title, workTitle, characterName, seriesName, maker, releaseText, status,
+      releaseYear, releaseMonth, sourceUrl, imageUrl, createdAtEpochMs, updatedAtEpochMs
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    userId,
+    title,
+    workTitle,
+    characterName,
+    seriesName,
+    maker,
+    releaseText,
+    defaultStatus,
+    releaseYear,
+    releaseMonth,
+    sourceUrl,
+    imageUrl,
+    createdAt,
+    createdAt
+  );
+  const after = getRow('prize_items', result.lastInsertRowid);
+  recordAudit('prize_items', result.lastInsertRowid, 'manual_insert', null, after, userId);
+  return getPrizeForUser(userId, result.lastInsertRowid);
+}
+
+async function importFiguresForUser(userId, sourceUrl) {
+  const figures = await extractFigureCandidatesFromUrl(sourceUrl);
+  const imported = [];
+  db.prepare(`
+    INSERT INTO user_figure_import_sources (userId, sourceUrl, createdAtEpochMs, lastSyncedAtEpochMs)
+    VALUES (?, ?, ?, NULL)
+    ON CONFLICT(userId, sourceUrl) DO NOTHING
+  `).run(userId, sourceUrl, now());
+  for (const figure of figures) {
+    const prize = upsertUserFigure(userId, figure);
+    if (prize) imported.push(prize);
+  }
+  db.prepare(`
+    UPDATE user_figure_import_sources
+    SET lastSyncedAtEpochMs = ?
+    WHERE userId = ? AND sourceUrl = ?
+  `).run(now(), userId, sourceUrl);
+  return imported;
+}
+
+async function refreshUserImportSources(userId) {
+  const syncBefore = now() - 30 * 60 * 1000;
+  const sources = db.prepare(`
+    SELECT sourceUrl
+    FROM user_figure_import_sources
+    WHERE userId = ? AND (lastSyncedAtEpochMs IS NULL OR lastSyncedAtEpochMs < ?)
+  `).all(userId, syncBefore);
+  for (const source of sources) {
+    try {
+      await importFiguresForUser(userId, source.sourceUrl);
+    } catch (error) {
+      recordAudit(
+        'user_figure_import_sources',
+        null,
+        'sync_error',
+        null,
+        { sourceUrl: source.sourceUrl, error: error.message || String(error) },
+        userId
+      );
+    }
+  }
+}
+
 async function handleApi(req, res, url) {
   const method = req.method || 'GET';
   const segments = url.pathname.split('/').filter(Boolean).slice(1);
@@ -702,6 +870,10 @@ async function handleApi(req, res, url) {
 
   if (method === 'GET' && segments[0] === 'prizes' && segments.length === 1) {
     const includeHidden = url.searchParams.get('includeHidden') === '1';
+    refreshUpcomingStatuses();
+    if (includeHidden) {
+      await refreshUserImportSources(user.id);
+    }
     const where = ['(p.ownerUserId IS NULL OR p.ownerUserId = ?)'];
     const params = [user.id];
     if (!includeHidden) {
@@ -768,64 +940,22 @@ async function handleApi(req, res, url) {
     return send(res, 200, await extractFigureCandidatesFromUrl(sourceUrl));
   }
 
+  if (method === 'POST' && segments[0] === 'figure-url' && segments[1] === 'import') {
+    const body = await readJson(req);
+    const sourceUrl = blank(body.url);
+    if (!sourceUrl) return sendError(res, 400, 'URL is required');
+    const imported = await importFiguresForUser(user.id, sourceUrl);
+    return send(res, 200, imported.map(normalizePrize));
+  }
+
   if (method === 'POST' && segments[0] === 'prizes' && segments.length === 1) {
     const body = await readJson(req);
-    const title = blank(body.title);
-    if (!title) return sendError(res, 400, 'Title is required');
-    const sourceUrl = blank(body.sourceUrl);
-    const createdAt = now();
-    const existing = sourceUrl
-      ? db.prepare('SELECT * FROM prize_items WHERE ownerUserId = ? AND sourceUrl = ?').get(user.id, sourceUrl)
-      : null;
-    if (existing) {
-      const before = { ...existing };
-      db.prepare(`
-        UPDATE prize_items SET
-          title = ?, workTitle = ?, characterName = ?, seriesName = ?, maker = ?,
-          releaseText = ?, releaseYear = ?, releaseMonth = ?, imageUrl = COALESCE(?, imageUrl),
-          updatedAtEpochMs = ?
-        WHERE id = ?
-      `).run(
-        title,
-        blank(body.workTitle) || title,
-        blank(body.characterName) || title,
-        blank(body.seriesName) || existing.seriesName,
-        blank(body.maker) || existing.maker,
-        blank(body.releaseText) || existing.releaseText,
-        Number.isInteger(body.releaseYear) ? body.releaseYear : existing.releaseYear,
-        Number.isInteger(body.releaseMonth) ? body.releaseMonth : existing.releaseMonth,
-        blank(body.imageUrl),
-        createdAt,
-        existing.id
-      );
-      const after = getRow('prize_items', existing.id);
-      recordAudit('prize_items', existing.id, 'manual_update', before, after, user.id);
-      return send(res, 200, getPrizeForUser(user.id, existing.id));
-    }
-    const result = db.prepare(`
-      INSERT INTO prize_items (
-        ownerUserId, title, workTitle, characterName, seriesName, maker, releaseText,
-        releaseYear, releaseMonth, sourceUrl, imageUrl, createdAtEpochMs, updatedAtEpochMs
-      )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
-      user.id,
-      title,
-      blank(body.workTitle) || title,
-      blank(body.characterName) || title,
-      blank(body.seriesName) || '手動追加',
-      blank(body.maker) || '未設定',
-      blank(body.releaseText) || '未設定',
-      Number.isInteger(body.releaseYear) ? body.releaseYear : null,
-      Number.isInteger(body.releaseMonth) ? body.releaseMonth : null,
-      sourceUrl,
-      blank(body.imageUrl),
-      createdAt,
-      createdAt
-    );
-    const after = getRow('prize_items', result.lastInsertRowid);
-    recordAudit('prize_items', result.lastInsertRowid, 'manual_insert', null, after, user.id);
-    return send(res, 201, getPrizeForUser(user.id, result.lastInsertRowid));
+    const prize = upsertUserFigure(user.id, {
+      ...body,
+      seriesName: blank(body.seriesName) || '手動追加',
+    });
+    if (!prize) return sendError(res, 400, 'Title is required');
+    return send(res, 201, prize);
   }
 
   if (method === 'PATCH' && segments[0] === 'prizes' && segments[2] === 'status') {
@@ -856,6 +986,7 @@ async function handleApi(req, res, url) {
     const before = getUserState(user.id, id);
     const memo = typeof body.memo === 'string' && body.memo.trim() ? body.memo.trim() : null;
     const existing = getUserState(user.id, id);
+    const currentPrize = getPrizeForUser(user.id, id);
     const updatedAt = now();
     db.prepare(`
       INSERT INTO user_prize_states (userId, prizeId, status, memo, acquiredAtEpochMs, createdAtEpochMs, updatedAtEpochMs)
@@ -863,7 +994,7 @@ async function handleApi(req, res, url) {
       ON CONFLICT(userId, prizeId) DO UPDATE SET
         memo = excluded.memo,
         updatedAtEpochMs = excluded.updatedAtEpochMs
-    `).run(user.id, id, existing?.status || 'unowned', memo, updatedAt, updatedAt);
+    `).run(user.id, id, existing?.status || currentPrize?.status || 'unowned', memo, updatedAt, updatedAt);
     const after = getUserState(user.id, id);
     recordAudit('user_prize_states', id, 'memo_update', before, after, user.id);
     return send(res, 200, getPrizeForUser(user.id, id));
@@ -982,7 +1113,7 @@ async function handleApi(req, res, url) {
       SELECT s.userId, s.status, p.id AS prizeId, p.title, p.characterName, p.seriesName, p.imageUrl, s.updatedAtEpochMs
       FROM user_prize_states s
       JOIN prize_items p ON p.id = s.prizeId
-      WHERE s.status IN ('owned', 'reserved', 'skipped')
+      WHERE s.status IN ('owned', 'upcoming', 'reserved', 'skipped')
       ORDER BY s.updatedAtEpochMs DESC
     `).all();
     const byUser = new Map(users.map((member) => [
@@ -990,7 +1121,7 @@ async function handleApi(req, res, url) {
       {
         id: member.id,
         username: member.username,
-        counts: { owned: 0, reserved: 0, skipped: 0 },
+        counts: { owned: 0, upcoming: 0, reserved: 0, skipped: 0 },
         items: []
       }
     ]));

@@ -308,23 +308,9 @@ class _FigureAddPageState extends State<FigureAddPage> {
     }
 
     await _run(() async {
-      final figures = await service.fetchFiguresFromUrl(url);
+      final figures = await service.importFiguresFromUrl(url);
       if (figures.isEmpty) {
         return 'URLから登録できるフィギュアが見つかりませんでした。';
-      }
-      for (final figure in figures) {
-        await service.createFigure(
-          title: figure.title,
-          workTitle: figure.workTitle ?? figure.title,
-          characterName: figure.characterName ?? figure.title,
-          seriesName: figure.seriesName ?? 'URL追加',
-          maker: figure.maker ?? '未設定',
-          releaseText: figure.releaseText ?? '未設定',
-          releaseYear: figure.releaseYear,
-          releaseMonth: figure.releaseMonth,
-          sourceUrl: figure.sourceUrl ?? url,
-          imageUrl: figure.imageUrl,
-        );
       }
       final count = await service.syncFromServer();
       _results = figures;

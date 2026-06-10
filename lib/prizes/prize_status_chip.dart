@@ -24,6 +24,11 @@ class PrizeStatusChip extends StatelessWidget {
 
   _StatusColors _colorsFor(BuildContext context, String status) {
     return switch (status) {
+      PrizeStatus.upcoming => _StatusColors(
+        background: Colors.indigo.shade100,
+        foreground: Colors.indigo.shade900,
+        border: Colors.indigo.shade400,
+      ),
       PrizeStatus.owned => _StatusColors(
         background: Colors.green.shade100,
         foreground: Colors.green.shade900,

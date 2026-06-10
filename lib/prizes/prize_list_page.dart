@@ -177,6 +177,7 @@ class _PrizeListPageState extends State<PrizeListPage> {
   }
 
   Future<void> _syncSamples() async {
+    await widget.repository.refreshUpcomingStatuses();
     await widget.repository.upsertFromSource();
     await widget.repository.syncStoreAppearances();
     await widget.notificationService.rescheduleArrivalNotifications(
@@ -436,6 +437,12 @@ class _FolderSidebar extends StatelessWidget {
               onStatusChanged(null);
               onStoreChanged(null);
             },
+          ),
+          _FolderItem(
+            icon: Icons.bookmark_border,
+            label: '今後登場',
+            selected: selectedStatus == PrizeStatus.upcoming,
+            onTap: () => onStatusChanged(PrizeStatus.upcoming),
           ),
           _FolderItem(
             icon: Icons.bookmark_border,
@@ -948,6 +955,11 @@ class _InlineFilters extends StatelessWidget {
             onTap: () => onStatusChanged(PrizeStatus.unowned),
           ),
           _FilterChipButton(
+            label: '\u4eca\u5f8c\u767b\u5834',
+            selected: selectedStatus == PrizeStatus.upcoming,
+            onTap: () => onStatusChanged(PrizeStatus.upcoming),
+          ),
+          _FilterChipButton(
             label: '獲得済み',
             selected: selectedStatus == PrizeStatus.owned,
             onTap: () => onStatusChanged(PrizeStatus.owned),
@@ -1398,6 +1410,8 @@ class _PrizeTile extends StatelessWidget {
         onStatusSelected(PrizeStatus.owned);
       case _PrizeAction.markUnowned:
         onStatusSelected(PrizeStatus.unowned);
+      case _PrizeAction.markUpcoming:
+        onStatusSelected(PrizeStatus.upcoming);
       case _PrizeAction.markReserved:
         onStatusSelected(PrizeStatus.reserved);
       case _PrizeAction.markSkipped:
@@ -1505,10 +1519,18 @@ class _ArrivalPill extends StatelessWidget {
   }
 }
 
-enum _PrizeAction { markOwned, markUnowned, markReserved, markSkipped, delete }
+enum _PrizeAction {
+  markOwned,
+  markUnowned,
+  markUpcoming,
+  markReserved,
+  markSkipped,
+  delete,
+}
 
 const _statusCycle = [
   PrizeStatus.unowned,
+  PrizeStatus.upcoming,
   PrizeStatus.owned,
   PrizeStatus.reserved,
   PrizeStatus.skipped,
@@ -1538,6 +1560,14 @@ List<PopupMenuEntry<_PrizeAction>> _statusMenuItems(String currentStatus) {
         child: ListTile(
           leading: const Icon(Icons.undo),
           title: Text('${PrizeStatus.label(PrizeStatus.unowned)}にする'),
+        ),
+      ),
+    if (currentStatus != PrizeStatus.upcoming)
+      PopupMenuItem(
+        value: _PrizeAction.markUpcoming,
+        child: ListTile(
+          leading: const Icon(Icons.schedule),
+          title: Text('${PrizeStatus.label(PrizeStatus.upcoming)}縺ｫ縺吶ｋ'),
         ),
       ),
     if (currentStatus != PrizeStatus.reserved)
@@ -1617,6 +1647,13 @@ String _displayImageUrl(String value) {
 
 _StatusStyle _statusStyle(String status) {
   switch (status) {
+    case PrizeStatus.upcoming:
+      return const _StatusStyle(
+        label: '\u4eca\u5f8c\u767b\u5834',
+        background: Color(0xFFECEBFF),
+        border: Color(0xFFD4D0FF),
+        foreground: Color(0xFF4540A0),
+      );
     case PrizeStatus.owned:
       return const _StatusStyle(
         label: '獲得済み',
